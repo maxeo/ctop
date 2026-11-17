@@ -6,6 +6,25 @@
 
 ## Deutsche Release Notes
 
+### v0.8.9 (2026-11-17)
+
+#### Sicherheit
+- **runc 1.4.4** (CVE-2026-41579 / GO-2026-5761), außerdem `klauspost/compress` 1.20.2 und `moby/go-archive` 0.3.0 (GO-2026-6253); `govulncheck` meldet keine Schwachstellen mehr
+
+#### Log-Ansicht
+- **Mausrad, Pfeiltasten, PgUp/PgDn** scrollen das Log; am Ende folgt die Ansicht wieder neuen Zeilen
+- **Seitenweises Nachladen**: beim Öffnen die letzten 20 Zeilen, ganz oben werden jeweils 200 ältere Zeilen nachgeladen
+- **Pos1 / Ende**: Pos1 lädt das gesamte Log und springt an den Anfang, Ende springt zurück ans Ende; auch mit Sequenzen, die termbox nicht kennt (PuTTY, MobaXterm, tmux)
+- **ANSI-Farbcodes** werden aus den Logzeilen entfernt
+
+#### Fehlerbehebungen
+- Log-Ansicht fror beim Scrollen dauerhaft ein (auch Strg+C wirkungslos)
+- Mehrere schnelle Tasten in der Log-Ansicht beendeten ctop
+- Quadratisches Layout blockierte die Log-Ansicht bei Logs mit tausenden Zeilen
+- Flackern und Verzögerung: `ui.TermWidth/TermHeight` erzwangen bei jedem Tick ein komplettes Neuzeichnen
+- Von `docker compose` neu erstellte Container behielten den temporären Namen `<id>_<name>` (Event `rename` wird jetzt verarbeitet)
+- Goroutine-Leak im Docker-Log-Collector
+
 ### v0.8.8 (2026-07-03)
 
 #### Sicherheit
@@ -124,6 +143,25 @@ Erster Release des gepflegten Forks von [bcicen/ctop](https://github.com/bcicen/
 ---
 
 ## English Release Notes
+
+### v0.8.9 (2026-11-17)
+
+#### Security
+- **runc 1.4.4** (CVE-2026-41579 / GO-2026-5761), plus `klauspost/compress` 1.20.2 and `moby/go-archive` 0.3.0 (GO-2026-6253); `govulncheck` reports no vulnerabilities
+
+#### Log view
+- **Mouse wheel, arrows, PgUp/PgDn** scroll the log; at the bottom the view follows new lines again
+- **Paged history**: opens with the last 20 lines, 200 older lines are loaded each time you reach the top
+- **Home / End**: Home loads the whole log and jumps to the start, End jumps back to the newest line; also with sequences termbox does not decode (PuTTY, MobaXterm, tmux)
+- **ANSI color codes** are stripped from log lines
+
+#### Fixes
+- Log view froze permanently when scrolling (Ctrl+C included)
+- Several fast keys in the log view quit ctop
+- Quadratic layout blocked the log view on logs with thousands of lines
+- Flicker and lag: `ui.TermWidth/TermHeight` forced a full repaint on every tick
+- Containers recreated by `docker compose` kept the temporary `<id>_<name>` name (`rename` event now handled)
+- Goroutine leak in the Docker log collector
 
 ### v0.8.8 (2026-07-03)
 
