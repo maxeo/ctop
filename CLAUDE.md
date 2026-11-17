@@ -30,7 +30,7 @@ There is no manual release. Everything fires from a `v*` tag on master.
 ```bash
 # 1. bump file + notes
 echo "0.8.7" > VERSION
-# edit RELEASE_NOTES.md — bilingual, DE section first, then EN, each under its own H2
+# edit RELEASE_NOTES.md — English only, new `## v<x.y.z>` section on top
 # 2. commit + push
 git commit -am "[CHG] Release v0.8.7: ..."
 git push origin master
@@ -79,6 +79,6 @@ Backends:
 ## Conventions
 
 - Commit prefixes (enforced by CI's release-notes parsing): `[ADD]` new feature, `[CHG]` modification, `[FIX]` bugfix. Use `[CHG]` for dep upgrades and CI changes.
-- `RELEASE_NOTES.md` is bilingual: `## Deutsche Release Notes` first, `## English Release Notes` second, each with `### v<x.y.z> (YYYY-MM-DD)` sections. Both sides must be updated for every release.
+- `RELEASE_NOTES.md` and `README.md` are English only. Release notes use one `## v<x.y.z> (YYYY-MM-DD)` section per release, newest first.
 - Go version in `go.mod` follows the actively supported release line. Bump both `go.mod` and all three `go-version:` entries in `.github/workflows/ci.yml` together.
 - The `// +build` legacy constraint coexists with `//go:build` on existing Linux-only files — leave the legacy line in place when editing.
