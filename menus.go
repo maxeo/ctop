@@ -20,13 +20,16 @@ import (
 // MenuFn executes a menu window, returning the next menu or nil
 type MenuFn func() MenuFn
 
-// inputEscMode switches termbox to Esc input mode while a text input is
-// open and returns the function that switches back. In the Alt mode used by
-// the rest of ctop a lone Esc is never reported (termbox waits for the next
-// key and sends Alt+key), so Esc could not close the input.
+// ctop's input mode. In termbox's Alt mode a lone Esc is never reported
+// (termbox waits for the next key and sends Alt+key), so Esc could close
+// nothing; ctop uses no Alt+key shortcut.
+const inputMode = tm.InputEsc
+
+// inputEscMode makes sure termbox is in Esc input mode while a text input or
+// panel is open, and returns the function that restores ctop's mode.
 func inputEscMode() (restore func()) {
 	tm.SetInputMode(tm.InputEsc)
-	return func() { tm.SetInputMode(tm.InputAlt) }
+	return func() { tm.SetInputMode(inputMode) }
 }
 
 // inputY places an input box at the bottom, above the key help and the
@@ -408,7 +411,7 @@ func ExecShell() MenuFn {
 	if err := ui.Init(); err != nil {
 		panic(err)
 	}
-	tm.SetInputMode(tm.InputAlt)
+	tm.SetInputMode(inputMode)
 	tm.Sync()
 	tm.Clear(tm.ColorDefault, tm.ColorDefault)
 

@@ -103,7 +103,7 @@ func main() {
 	if err := ui.Init(); err != nil {
 		panic(err)
 	}
-	tm.SetInputMode(tm.InputAlt)
+	tm.SetInputMode(inputMode)
 
 	defer Shutdown()
 	// init grid, cursor, header

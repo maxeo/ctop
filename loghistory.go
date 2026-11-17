@@ -17,13 +17,19 @@ import (
 // Head replaces it with the start of the log, detached from the tail;
 // LoadNext then adds newer pages when the user scrolls down, until the view
 // reaches the tail and follows new lines again. Tail goes back to the end.
+// FindOlder and FindNewer replace it with the lines around a match.
 // Only one load runs at a time.
+//
+// The view keeps a limited number of lines: the ones furthest from the screen
+// are dropped and loaded again from the log when the user goes back to them.
 type logHistory struct {
-	view      *widgets.TextView
-	source    collector.LogHistory
-	label     string
-	loadMu    sync.Mutex  // held while a load runs
-	exhausted atomic.Bool // the start of the log is loaded
+	view   *widgets.TextView
+	source collector.LogHistory
+	label  string
+	loadMu sync.Mutex // held while a load runs
+	// the first line of the log, while it is the oldest one in the view
+	// (nil if the start of the log is not loaded, or was dropped since)
+	start atomic.Pointer[toggleLog]
 }
 
 func newLogHistory(view *widgets.TextView, source collector.LogHistory, label string) *logHistory {
@@ -33,7 +39,7 @@ func newLogHistory(view *widgets.TextView, source collector.LogHistory, label st
 // LoadPage prepends the page of lines before the oldest one shown.
 func (h *logHistory) LoadPage() {
 	// skip if another load is running: it will move the view anyway
-	if h.exhausted.Load() || !h.loadMu.TryLock() {
+	if h.atStart() || !h.loadMu.TryLock() {
 		return
 	}
 	defer h.loadMu.Unlock()
@@ -41,42 +47,76 @@ func (h *logHistory) LoadPage() {
 }
 
 func (h *logHistory) loadPage() bool {
-	first, loaded := h.oldest()
-	if first == nil {
+	cur, loaded, ok := h.cursor(false)
+	if !ok {
 		return false
 	}
-	older, more, err := h.source.Older(first.timestamp, loaded)
+	skip := loaded
+	if h.view.Detached() {
+		skip = -1 // the loaded lines don't end at the tail
+	}
+	older, more, err := h.source.Older(cur, skip)
 	if err != nil {
 		log.Errorf("loading older logs: %s", err)
 		return false
 	}
-	if !more {
-		h.exhausted.Store(true)
-	}
 	h.view.Prepend(toToggleText(older))
+	if !more {
+		h.markStart()
+	}
 	return len(older) > 0
 }
 
-// LoadAll prepends every line before the oldest one shown. It reports
-// whether lines were added.
-func (h *logHistory) LoadAll() bool {
+// FindOlder shows the lines around the newest line older than the loaded
+// ones that matches. It reports whether one was found.
+func (h *logHistory) FindOlder(match func(string) bool) bool {
 	h.loadMu.Lock()
 	defer h.loadMu.Unlock()
 
-	first, _ := h.oldest()
-	if first == nil || h.exhausted.Load() {
+	cur, _, ok := h.cursor(false)
+	if !ok || h.atStart() {
 		return false
 	}
 	h.busy(true)
-	older, err := h.source.AllBefore(first.timestamp)
+	lines, found, err := h.source.FindOlder(cur, match)
 	h.busy(false)
 	if err != nil {
-		log.Errorf("loading all logs: %s", err)
+		log.Errorf("searching older logs: %s", err)
 		return false
 	}
-	h.exhausted.Store(true)
-	h.view.Prepend(toToggleText(older))
-	return len(older) > 0
+	if !found {
+		return false
+	}
+	h.start.Store(nil)
+	h.view.Replace(toToggleText(lines))
+	return true
+}
+
+// FindNewer shows the lines around the oldest line newer than the loaded
+// ones that contains query, while the view is detached from the tail. It
+// reports whether one was found.
+func (h *logHistory) FindNewer(match func(string) bool) bool {
+	h.loadMu.Lock()
+	defer h.loadMu.Unlock()
+
+	cur, _, ok := h.cursor(true)
+	if !ok || !h.view.Detached() {
+		return false
+	}
+	h.busy(true)
+	lines, found, err := h.source.FindNewer(cur, match)
+	h.busy(false)
+	if err != nil {
+		log.Errorf("searching newer logs: %s", err)
+		return false
+	}
+	if !found {
+		return false
+	}
+	h.start.Store(nil)
+	h.view.Replace(toToggleText(lines))
+	h.view.ScrollToTop()
+	return true
 }
 
 // Head shows the first page of the log.
@@ -84,7 +124,7 @@ func (h *logHistory) Head() {
 	h.loadMu.Lock()
 	defer h.loadMu.Unlock()
 
-	if h.exhausted.Load() && !h.view.Detached() {
+	if h.atStart() && !h.view.Detached() {
 		// the whole log is loaded already
 		h.view.ScrollToTop()
 		return
@@ -93,7 +133,7 @@ func (h *logHistory) Head() {
 	wasDetached := h.view.Detached()
 	h.view.Detach()
 	h.busy(true)
-	page, more, err := h.source.Newer(time.Time{})
+	page, more, err := h.source.Newer(collector.LogCursor{})
 	h.busy(false)
 	if err != nil {
 		log.Errorf("loading the start of the log: %s", err)
@@ -102,7 +142,6 @@ func (h *logHistory) Head() {
 		}
 		return
 	}
-	h.exhausted.Store(true)
 	if more {
 		h.view.Replace(toToggleText(page))
 	} else {
@@ -110,6 +149,7 @@ func (h *logHistory) Head() {
 		h.view.Replace(nil)
 		h.attach(page)
 	}
+	h.markStart()
 	h.view.ScrollToTop()
 }
 
@@ -124,11 +164,11 @@ func (h *logHistory) LoadNext() {
 }
 
 func (h *logHistory) loadNext() bool {
-	last := h.newest()
-	if last == nil || !h.view.Detached() {
+	cur, _, ok := h.cursor(true)
+	if !ok || !h.view.Detached() {
 		return false
 	}
-	page, more, err := h.source.Newer(last.timestamp)
+	page, more, err := h.source.Newer(cur)
 	if err != nil {
 		log.Errorf("loading newer logs: %s", err)
 		return false
@@ -137,24 +177,6 @@ func (h *logHistory) loadNext() bool {
 		h.view.Append(toToggleText(page))
 	} else {
 		h.attach(page)
-	}
-	return true
-}
-
-// LoadRest appends pages until the view joins the tail again. It reports
-// whether lines were added.
-func (h *logHistory) LoadRest() bool {
-	h.loadMu.Lock()
-	defer h.loadMu.Unlock()
-	if !h.view.Detached() {
-		return false
-	}
-	h.busy(true)
-	defer h.busy(false)
-	for h.view.Detached() {
-		if !h.loadNext() {
-			return false
-		}
 	}
 	return true
 }
@@ -170,18 +192,21 @@ func (h *logHistory) Tail() {
 
 	cutoff := time.Now()
 	h.busy(true)
-	page, _, err := h.source.Older(cutoff, 0)
+	page, more, err := h.source.Older(collector.LogCursor{Time: cutoff}, 0)
 	h.busy(false)
 	if err != nil {
 		log.Errorf("loading the end of the log: %s", err)
 		return
 	}
-	h.exhausted.Store(false)
+	h.start.Store(nil)
 	h.view.Replace(nil)
 	h.view.Attach(toToggleText(page), func(l widgets.ToggleText) bool {
 		tl, ok := l.(*toggleLog)
-		return ok && !tl.timestamp.Before(cutoff)
+		return ok && tl.timestamp.After(cutoff)
 	})
+	if !more {
+		h.markStart()
+	}
 	h.view.ScrollToBottom()
 }
 
@@ -191,8 +216,8 @@ func (h *logHistory) attach(page []models.Log) {
 	var after time.Time
 	if len(page) > 0 {
 		after = page[len(page)-1].Timestamp
-	} else if last := h.newest(); last != nil {
-		after = last.timestamp
+	} else if cur, _, ok := h.cursor(true); ok {
+		after = cur.Time
 	}
 	h.view.Attach(toToggleText(page), func(l widgets.ToggleText) bool {
 		tl, ok := l.(*toggleLog)
@@ -208,15 +233,41 @@ func (h *logHistory) busy(on bool) {
 	}
 }
 
-func (h *logHistory) oldest() (*toggleLog, int) {
-	oldest, loaded := h.view.Oldest()
-	first, _ := oldest.(*toggleLog)
-	return first, loaded
+// cursor returns the position of the oldest loaded line (the newest one if
+// newest) and how many lines are loaded. ok is false if none is.
+func (h *logHistory) cursor(newest bool) (cur collector.LogCursor, loaded int, ok bool) {
+	line, run, loaded := h.view.Edge(newest, sameTime)
+	tl, ok := line.(*toggleLog)
+	if !ok {
+		return cur, loaded, false
+	}
+	return collector.LogCursor{Time: tl.timestamp, Same: run}, loaded, true
 }
 
-func (h *logHistory) newest() *toggleLog {
-	last, _ := h.view.Newest().(*toggleLog)
-	return last
+func sameTime(a, b widgets.ToggleText) bool {
+	ta, okA := a.(*toggleLog)
+	tb, okB := b.(*toggleLog)
+	return okA && okB && ta.timestamp.Equal(tb.timestamp)
+}
+
+// markStart records that the oldest line in the view is the first one of
+// the log.
+func (h *logHistory) markStart() {
+	line, _, _ := h.view.Edge(false, sameTime)
+	tl, _ := line.(*toggleLog)
+	h.start.Store(tl)
+}
+
+// atStart reports whether the first line of the log is loaded: it is still
+// the oldest line in the view (not dropped to save memory).
+func (h *logHistory) atStart() bool {
+	start := h.start.Load()
+	if start == nil {
+		return false
+	}
+	line, _, _ := h.view.Edge(false, sameTime)
+	tl, _ := line.(*toggleLog)
+	return tl == start
 }
 
 func toToggleText(logs []models.Log) []widgets.ToggleText {

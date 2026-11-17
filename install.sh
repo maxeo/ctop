@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/maxeo/ctop/master/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/maxeo/ctop/master/install.sh | sh -s -- --version 0.8.9 --dir ~/.local/bin
 #
-# POSIX sh; needs curl or wget. Works on Linux (amd64, arm64, armv7) and macOS.
+# POSIX sh; needs curl or wget. Works on Linux (amd64, arm64, armv6/armv7) and macOS.
 set -eu
 
 REPO="maxeo/ctop"
@@ -187,9 +187,9 @@ if [ "$VERIFY" -eq 1 ]; then
 	expected=$(fetch "$BASE/sha256sums.txt" 2>/dev/null | awk -v f="$FILE" '$2 == f || $2 == "*" f { print $1 }' || true)
 	actual=$(sha256 "$TMP/ctop")
 	if [ -z "$expected" ]; then
-		echo "warning: $FILE not listed in sha256sums.txt, checksum not verified" >&2
+		die "$FILE is not listed in $BASE/sha256sums.txt, so it cannot be verified (--no-verify installs it anyway)"
 	elif [ -z "$actual" ]; then
-		echo "warning: no sha256sum/shasum available, checksum not verified" >&2
+		die "sha256sum or shasum is needed to verify the download (--no-verify installs it anyway)"
 	elif [ "$expected" != "$actual" ]; then
 		die "checksum mismatch for $FILE (expected $expected, got $actual)"
 	fi

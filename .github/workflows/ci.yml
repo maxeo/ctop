@@ -68,7 +68,7 @@ jobs:
             suffix: linux-arm64
           - goos: linux
             goarch: arm
-            goarm: '7'
+            goarm: '6'
             suffix: linux-arm
           - goos: darwin
             goarch: amd64

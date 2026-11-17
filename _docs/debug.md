@@ -12,7 +12,7 @@ docker run -ti --rm \
            -e CTOP_DEBUG_TCP=1 \
            -p 9000:9000 \
            -v /var/run/docker.sock:/var/run/docker.sock \
-           ghcr.io/eqms/ctop:latest
+           ghcr.io/maxeo/ctop:latest
 ```
 
 Log messages can be followed by connecting to the default listen address:

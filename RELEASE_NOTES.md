@@ -1,5 +1,32 @@
 # Release Notes
 
+## v0.8.12 (2026-11-17)
+
+### Container list
+- **Esc quits ctop** from the container list, like `q`. When something is open (full key help, sort or columns panel, filter, menu, log view), Esc closes it first, one level at a time. ctop now runs in termbox's Esc input mode everywhere: the Alt mode never reported a lone Esc
+- **Ctrl+C quits ctop from any view** and restores the terminal; in the log view's selection mode it works like Esc, since it is often a copy shortcut there
+- **Home / End sent as `\e[H`, `\e[1~` and similar** (PuTTY, MobaXterm) are ignored on the list: the `H` of `\e[H` used to hide the header
+
+### Log view
+- **Large logs use little memory**: the view keeps at most 50,000 lines and drops the ones furthest from the screen, loading them again from Docker when you scroll back to them. Searching the whole log no longer loads it into memory: the log is read as a stream and only the lines around the match are kept (with 200,000 lines, about 21 MB instead of about 105 MB)
+- **Search in selection mode**: `Ctrl+F` (or `/`), `n` and `N` also work in text selection mode, and a click while typing a search switches to selection without closing the prompt
+- **Search for several words**: in the Base and Whole word modes, words separated by spaces find the lines that contain all of them, in any order, and each word is highlighted (`warn power main` finds `WARNING (MainThread) ... power state`)
+- **Search modes**: `Tab` (in the search prompt, or while a search is shown) switches between Base (the text anywhere), Whole word (letters with accents count as letters) and Regex (Go syntax; while it is not a valid expression, e.g. half typed, its error is shown). All modes ignore case
+- **Enter goes to the next match in the direction you last scrolled**: up (or `n`, `End`) finds the previous match, down (or `N`, `Home`) the next one
+- **Ctrl+S** switches the text selection mode on and off like `s`, also while typing a search
+- **Key help on three rows** when the keys of the current mode do not fit in two
+- **Scroll while typing a search**: the arrows, `Home`, `End` and the mouse wheel move the log while the search prompt is open (they were ignored), the next letter searches from the new position, and the key help lists the keys of the prompt
+
+### Fixes
+- **Long lines with accents or wide characters**: lines were wrapped by bytes, so a row could end in the middle of a character (`è`, `日`) and show broken symbols. They are now wrapped by terminal cells, and a wide character that does not fit goes to the next row
+- **Lines with the same timestamp**: loading older or newer pages could skip or repeat lines that share their timestamp with the first or last loaded line
+- **Loading older lines after a search or the start of the log** read from the end of the log and could find nothing
+
+### Install
+- **`install.sh` stops if the checksum cannot be checked** (file missing from `sha256sums.txt`, or no `sha256sum`/`shasum`), unless `--no-verify` is given
+- **ARMv6** (Raspberry Pi Zero / 1): the `linux-arm` binary is now built for ARMv6, so it runs on both ARMv6 and ARMv7
+- **README and Homebrew formula** pointed to the upstream `eqms/ctop` (Docker image and release downloads); they now point to `maxeo/ctop`. There is no Homebrew tap for this fork yet
+
 ## v0.8.11 (2026-11-17)
 
 ### Container list

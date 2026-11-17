@@ -57,7 +57,7 @@ func LogMenu() MenuFn {
 		case <-m.Stopped():
 		case <-time.After(time.Second):
 		}
-		tm.SetInputMode(tm.InputAlt)
+		tm.SetInputMode(inputMode)
 	}()
 
 	// Close at most once: several key events can arrive before the loop

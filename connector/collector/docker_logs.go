@@ -2,7 +2,6 @@ package collector
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"io"
 	"regexp"
@@ -91,32 +90,80 @@ func (l *DockerLogs) Stream() chan models.Log {
 
 func (l *DockerLogs) Stop() { l.done <- true }
 
-// Older implements LogHistory. Docker cannot combine "tail" with "until"
-// (tail is applied first), so it asks for the last skip+page lines and keeps
-// the ones older than before.
-func (l *DockerLogs) Older(before time.Time, skip int) ([]models.Log, bool, error) {
-	tail := skip + logPageSize
-	older, fetched, err := l.readBefore(before, strconv.Itoa(tail))
-	if err != nil {
+// Older implements LogHistory. Docker applies "tail" before any time filter
+// and has no "until" in this client, so when the loaded lines end at the
+// tail (skip >= 0) it reads the last skip+page lines; otherwise, or if those
+// are all newer than before, it reads the log from the start up to before.
+// Both keep at most a page in memory.
+func (l *DockerLogs) Older(before LogCursor, skip int) ([]models.Log, bool, error) {
+	if skip >= 0 {
+		tail := skip + before.Same + logPageSize
+		p := pageBefore{cur: before, n: logPageSize}
+		read := 0
+		err := l.stream(time.Time{}, strconv.Itoa(tail), func(e models.Log) bool {
+			read++
+			p.add(e) // a line out of time order does not end the read
+			return true
+		})
+		if err != nil {
+			return nil, false, err
+		}
+		lines, more := p.result()
+		if read < tail {
+			// the whole log has been read
+			return lines, more, nil
+		}
+		if len(lines) > 0 {
+			return lines, true, nil
+		}
+	}
+
+	p := pageBefore{cur: before, n: logPageSize}
+	if err := l.stream(time.Time{}, "all", p.add); err != nil {
 		return nil, false, err
 	}
-	if len(older) > logPageSize {
-		older = older[len(older)-logPageSize:]
-	}
-	// fewer lines than requested: the whole log has been read
-	return older, fetched >= tail, nil
-}
-
-// AllBefore implements LogHistory.
-func (l *DockerLogs) AllBefore(before time.Time) ([]models.Log, error) {
-	older, _, err := l.readBefore(before, "all")
-	return older, err
+	lines, more := p.result()
+	return lines, more, nil
 }
 
 // Newer implements LogHistory. Docker has no "head" option: it reads the log
 // forward (from the second of after, via "since") and stops the request once
 // a page plus one line is read.
-func (l *DockerLogs) Newer(after time.Time) ([]models.Log, bool, error) {
+func (l *DockerLogs) Newer(after LogCursor) ([]models.Log, bool, error) {
+	p := pageAfter{after: afterCursor{cur: after}, n: logPageSize}
+	if err := l.stream(after.Time, "all", p.add); err != nil {
+		return nil, false, err
+	}
+	return p.lines, p.more, nil
+}
+
+// FindOlder implements LogHistory. It reads the log from the start up to
+// before, keeping only the lines around the last match.
+func (l *DockerLogs) FindOlder(before LogCursor, match func(string) bool) ([]models.Log, bool, error) {
+	f := newFindBefore(before, match, logPageSize/2)
+	if err := l.stream(time.Time{}, "all", f.add); err != nil {
+		return nil, false, err
+	}
+	return f.win, f.found, nil
+}
+
+// FindNewer implements LogHistory. It reads the log from after and stops
+// shortly after the first match.
+func (l *DockerLogs) FindNewer(after LogCursor, match func(string) bool) ([]models.Log, bool, error) {
+	f := newFindAfter(after, match, logPageSize/2)
+	if err := l.stream(after.Time, "all", f.add); err != nil {
+		return nil, false, err
+	}
+	return f.win, f.found, nil
+}
+
+// most bytes in a log line; longer lines end the read with an error
+const maxLogLine = 1 << 20
+
+// stream reads the log without following it: the last tail lines ("all" for
+// every line), from the second of since if not zero. It calls fn for each
+// line, oldest first, and stops the request as soon as fn returns false.
+func (l *DockerLogs) stream(since time.Time, tail string, fn func(models.Log) bool) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -127,12 +174,12 @@ func (l *DockerLogs) Newer(after time.Time) ([]models.Log, bool, error) {
 		OutputStream: newDemuxWriter(w),
 		Stdout:       true,
 		Stderr:       true,
-		Tail:         "all",
+		Tail:         tail,
 		Timestamps:   true,
 		RawTerminal:  true,
 	}
-	if !after.IsZero() {
-		opts.Since = after.Unix()
+	if !since.IsZero() {
+		opts.Since = since.Unix()
 	}
 	errCh := make(chan error, 1)
 	go func() {
@@ -141,60 +188,23 @@ func (l *DockerLogs) Newer(after time.Time) ([]models.Log, bool, error) {
 		errCh <- err
 	}()
 
-	var page []models.Log
-	more := false
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 64*1024), maxLogLine)
+	stopped := false
 	for scanner.Scan() {
-		entry := l.parseLine(scanner.Text())
-		if !after.IsZero() && !entry.Timestamp.After(after) {
-			continue
-		}
-		if len(page) == logPageSize {
-			more = true
+		if !fn(l.parseLine(scanner.Text())) {
+			stopped = true
 			break
 		}
-		page = append(page, entry)
 	}
-	if more {
+	if scanErr := scanner.Err(); scanErr != nil || stopped {
+		// end the request early and unblock its writer
 		cancel()
-		r.CloseWithError(context.Canceled) // unblock the writer
+		r.CloseWithError(context.Canceled)
 		<-errCh
-		return page, true, nil
+		return scanErr
 	}
-	if err := <-errCh; err != nil {
-		return nil, false, err
-	}
-	return page, false, nil
-}
-
-// readBefore reads the last tail lines (non-following) and returns those
-// logged before the given time, plus how many lines were read in total.
-func (l *DockerLogs) readBefore(before time.Time, tail string) ([]models.Log, int, error) {
-	var buf bytes.Buffer
-	opts := api.LogsOptions{
-		Container:    l.id,
-		OutputStream: newDemuxWriter(&buf),
-		Stdout:       true,
-		Stderr:       true,
-		Tail:         tail,
-		Timestamps:   true,
-		RawTerminal:  true,
-	}
-	if err := l.client.Logs(opts); err != nil {
-		return nil, 0, err
-	}
-
-	var older []models.Log
-	fetched := 0
-	scanner := bufio.NewScanner(&buf)
-	for scanner.Scan() {
-		fetched++
-		entry := l.parseLine(scanner.Text())
-		if entry.Timestamp.Before(before) {
-			older = append(older, entry)
-		}
-	}
-	return older, fetched, nil
+	return <-errCh
 }
 
 func (l *DockerLogs) parseLine(line string) models.Log {

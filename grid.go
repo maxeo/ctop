@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"strings"
 	"time"
 
 	"github.com/eqms/ctop/config"
@@ -163,6 +165,85 @@ func showPanel(m *menu.Menu, keys []widgets.KeyHelp) (hide func()) {
 	}
 }
 
+// Esc on the container list hides the full key help, otherwise it quits
+// ctop. ctop runs in termbox's Esc input mode, which reports Esc at once but
+// also when an escape sequence termbox doesn't decode starts: Esc quits only
+// if no other key follows within escWait.
+const gridEscEvent = "/grid/esc"
+
+var (
+	gridEscSeq int // counts Esc keys on the list
+	gridEscID  int // gridEscSeq of the Esc waiting for escWait, 0 if none
+	gridCSI    csiKeys
+)
+
+// gridSeqKey reports whether the key belongs to an escape sequence termbox
+// doesn't decode (e.g. Home sent as \e[H by some terminals): such keys are
+// dropped, so that "H" does not hide the header. It also cancels a pending Esc.
+func gridSeqKey(path string) bool {
+	k := strings.TrimPrefix(path, "/sys/kbd/")
+	if gridEscID != 0 && k != "<escape>" {
+		// a key right after Esc: the Esc was not a lone one
+		gridEscID = 0
+		if k == "[" || k == "O" {
+			gridCSI.Start()
+			return true
+		}
+	}
+	if k == "M-[" || k == "M-O" {
+		gridCSI.Start()
+		return true
+	}
+	_, consumed := gridCSI.Feed(k)
+	return consumed
+}
+
+// filterGridKeys makes every key handler of the list skip the keys of an
+// escape sequence (see gridSeqKey). Call it after registering the handlers.
+func filterGridKeys() {
+	ui.Handle("/sys/kbd/", func(ui.Event) {}) // let every key reach gridSeqKey
+	es := ui.DefaultEvtStream
+	for path, h := range es.Handlers {
+		// Handle stores the catch-all above as "/sys/kbd" (cleaned path)
+		if path != "/sys/kbd" && !strings.HasPrefix(path, "/sys/kbd/") {
+			continue
+		}
+		h := h
+		es.Handlers[path] = func(e ui.Event) {
+			if !gridSeqKey(e.Path) {
+				h(e)
+			}
+		}
+	}
+}
+
+func gridEscape() {
+	if gridKeys.ShowAll {
+		gridKeys.ShowAll = false
+		RedrawRows(true)
+		return
+	}
+	gridEscSeq++
+	gridEscID = gridEscSeq
+	id := gridEscID
+	time.AfterFunc(escWait, func() { ui.SendCustomEvt(gridEscEvent, id) })
+}
+
+// gridHook sees every event, in every view, after its handler.
+func gridHook(e ui.Event) {
+	logEvent(e)
+	if e.Path == "/sys/kbd/C-c" {
+		if ctrlCHandled {
+			// the log view used it to leave the selection mode
+			ctrlCHandled = false
+			return
+		}
+		// Ctrl+C quits from any view
+		Shutdown()
+		os.Exit(0)
+	}
+}
+
 // key help at the bottom of the container list, like nano; h shows every key
 var gridKeys = widgets.NewKeyBar([]widgets.KeyHelp{
 	{Key: "Enter", Label: "Menu"},
@@ -174,7 +255,7 @@ var gridKeys = widgets.NewKeyBar([]widgets.KeyHelp{
 	{Key: "a", Label: "All containers"},
 	{Key: "c", Label: "Columns"},
 	{Key: "h", Label: "Help"},
-	{Key: "q", Label: "Quit"},
+	{Key: "q Esc", Label: "Quit"},
 }, []widgets.KeyHelp{
 	{Key: "Enter", Label: "Container menu"},
 	{Key: "↑ ↓", Label: "Select container"},
@@ -190,8 +271,8 @@ var gridKeys = widgets.NewKeyBar([]widgets.KeyHelp{
 	{Key: "c", Label: "Columns"},
 	{Key: "H", Label: "Header"},
 	{Key: "S", Label: "Save config"},
-	{Key: "h", Label: "Hide help"},
-	{Key: "q", Label: "Quit"},
+	{Key: "h Esc", Label: "Hide help"},
+	{Key: "q Esc ^C", Label: "Quit"},
 })
 
 func SingleView() MenuFn {
@@ -244,7 +325,7 @@ func Display() bool {
 	var connErr error
 
 	cGrid.SetWidth(cwidgets.TermWidth())
-	ui.DefaultEvtStream.Hook(logEvent)
+	ui.DefaultEvtStream.Hook(gridHook)
 
 	// initial draw
 	header.Align()
@@ -260,6 +341,13 @@ func Display() bool {
 	HandleKeys("pgdown", cursor.PgDown)
 
 	HandleKeys("exit", ui.StopLoop)
+	ui.Handle("/sys/kbd/<escape>", func(ui.Event) { gridEscape() })
+	ui.Handle(gridEscEvent, func(e ui.Event) {
+		if id, ok := e.Data.(int); ok && id == gridEscID {
+			gridEscID = 0
+			ui.StopLoop()
+		}
+	})
 	HandleKeys("help", func() {
 		gridKeys.ShowAll = !gridKeys.ShowAll
 		RedrawRows(true)
@@ -339,6 +427,8 @@ func Display() bool {
 			ui.StopLoop()
 		}
 	})
+
+	filterGridKeys()
 
 	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
 		tm.Clear(tm.ColorDefault, tm.ColorDefault) // also refreshes termbox's cached size

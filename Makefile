@@ -16,6 +16,7 @@ build-all:
 	GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build -tags release -ldflags $(LD_FLAGS) -o _build/ctop-$(VERSION)-darwin-arm64
 	GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -tags release -ldflags $(LD_FLAGS) -o _build/ctop-$(VERSION)-linux-amd64
 	GOOS=linux   GOARCH=arm64 CGO_ENABLED=0 go build -tags release -ldflags $(LD_FLAGS) -o _build/ctop-$(VERSION)-linux-arm64
+	GOOS=linux   GOARCH=arm GOARM=6 CGO_ENABLED=0 go build -tags release -ldflags $(LD_FLAGS) -o _build/ctop-$(VERSION)-linux-arm
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags release -ldflags $(LD_FLAGS) -o _build/ctop-$(VERSION)-windows-amd64.exe
 	cd _build; sha256sum * > sha256sums.txt
 

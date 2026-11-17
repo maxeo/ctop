@@ -25,14 +25,14 @@ Changes in this fork:
 - Supply-chain hardening (SHA-pinned CI actions, Dependabot, digest-pinned Docker base image)
 - Updated to Go 1.22 with modern stdlib packages (`log/slog`, `os.ReadDir`)
 - Replaced unmaintained dependencies (`op/go-logging`, `nu7hatch/gouuid`, `pkg/errors`)
-- GitHub Actions CI/CD with multi-platform builds (Linux amd64/arm64, macOS amd64/arm64, Windows amd64)
-- Docker images published to GHCR (`ghcr.io/eqms/ctop`)
+- GitHub Actions CI/CD with multi-platform builds (Linux amd64/arm64/arm, macOS amd64/arm64, Windows amd64)
+- Docker images published to GHCR (`ghcr.io/maxeo/ctop`)
 
 ## Installation
 
 ### Install or update with `install.sh` (Linux & macOS)
 
-Downloads the latest release for the system and architecture (amd64, arm64, armv7), verifies its SHA256 checksum and replaces an existing `ctop` in place (otherwise `/usr/local/bin`). `sudo` is used only when the target directory is not writable. Works with `curl` or `wget` and POSIX `sh` (Debian/Ubuntu, Fedora/RHEL, Alpine, Arch, Raspberry Pi OS, macOS).
+Downloads the latest release for the system and architecture (amd64, arm64, armv6/armv7), verifies its SHA256 checksum (it stops if the checksum cannot be checked, unless `--no-verify`) and replaces an existing `ctop` in place (otherwise `/usr/local/bin`). `sudo` is used only when the target directory is not writable. Works with `curl` or `wget` and POSIX `sh` (Debian/Ubuntu, Fedora/RHEL, Alpine, Arch, Raspberry Pi OS, macOS).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/maxeo/ctop/master/install.sh | sh
@@ -70,7 +70,7 @@ Get the latest binaries from the [Releases page](https://github.com/maxeo/ctop/r
 |----------|-------------|------|
 | Linux | amd64 | `ctop-<version>-linux-amd64` |
 | Linux | arm64 | `ctop-<version>-linux-arm64` |
-| Linux | armv7 | `ctop-<version>-linux-arm` |
+| Linux | armv6 / armv7 (Raspberry Pi) | `ctop-<version>-linux-arm` |
 | macOS | Intel | `ctop-<version>-darwin-amd64` |
 | macOS | Apple Silicon | `ctop-<version>-darwin-arm64` |
 | Windows | amd64 | `ctop-<version>-windows-amd64.exe` |
@@ -85,9 +85,7 @@ Get the latest binaries from the [Releases page](https://github.com/maxeo/ctop/r
 
 ### Homebrew (macOS & Linux)
 
-```bash
-brew install eqms/ctop/ctop
-```
+There is no Homebrew tap for this fork yet: `brew install eqms/ctop/ctop` installs the upstream `eqms/ctop` build, not this one. Use `install.sh` (above) instead, also on macOS.
 
 ### Docker
 
@@ -95,7 +93,7 @@ brew install eqms/ctop/ctop
 docker run --rm -ti \
   --name=ctop \
   --volume /var/run/docker.sock:/var/run/docker.sock:ro \
-  ghcr.io/eqms/ctop:latest
+  ghcr.io/maxeo/ctop:latest
 ```
 
 ## Usage
@@ -133,7 +131,7 @@ docker run --rm -ti \
 | <kbd>w</kbd> | Open the lowest published TCP port in a browser (over SSH, the URL is shown instead) |
 | <kbd>c</kbd> | Configure columns below the list (changes show at once) |
 | <kbd>S</kbd> | Save current configuration to file |
-| <kbd>q</kbd> | Quit ctop |
+| <kbd>q</kbd>, <kbd>Esc</kbd> | Quit ctop. When something is open (full key help, sort or columns panel, filter, menu, log view), <kbd>Esc</kbd> closes it first, one level at a time |
 
 #### Log view
 
@@ -143,8 +141,8 @@ docker run --rm -ti \
 | <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Previous / next screen |
 | <kbd>Home</kbd> | Start of the log (later pages load as you scroll down) |
 | <kbd>End</kbd> | Newest lines, following new output (shown as if scrolled past the end: the last 20 lines on top, room for new ones below) |
-| <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> | Search: loaded lines are searched while you type, <kbd>Enter</kbd> keeps the search (and searches the whole log if no loaded line matches), <kbd>n</kbd> older match, <kbd>N</kbd> newer match, <kbd>Esc</kbd> to end |
-| Click or <kbd>s</kbd> | Text selection mode: the mouse is left to the terminal, so click and drag selects text (<kbd>s</kbd> or <kbd>Esc</kbd> to leave) |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> | Search, ignoring case: loaded lines are searched while you type, <kbd>Enter</kbd> keeps the search (and searches the whole log if no loaded line matches), <kbd>n</kbd> older match, <kbd>N</kbd> newer match, <kbd>Enter</kbd> next match in the direction you last scrolled, <kbd>Esc</kbd> to end. <kbd>Tab</kbd> (in the prompt or while a search is shown) changes the mode: Base (the text anywhere), Whole word, Regex (Go syntax). In Base and Whole word, several words separated by spaces find the lines that contain all of them, in any order. The arrows, <kbd>PgUp</kbd> <kbd>PgDn</kbd>, <kbd>Home</kbd>, <kbd>End</kbd> and the wheel scroll the log while you type |
+| Click, <kbd>s</kbd> or <kbd>Ctrl</kbd>+<kbd>S</kbd> | Text selection mode: the mouse is left to the terminal, so click and drag selects text (<kbd>s</kbd>, <kbd>Ctrl</kbd>+<kbd>S</kbd> or <kbd>Esc</kbd> to leave; <kbd>Ctrl</kbd>+<kbd>S</kbd> also works while typing a search). The search keys work here too, a click while typing a search keeps the prompt open, and <kbd>Ctrl</kbd>+<kbd>C</kbd> works like <kbd>Esc</kbd> |
 | <kbd>t</kbd> | Toggle timestamps |
 | <kbd>Esc</kbd> | End the search or the selection mode, otherwise close the log view |
 | <kbd>q</kbd>, <kbd>←</kbd> <kbd>→</kbd>, other keys | Close the log view |

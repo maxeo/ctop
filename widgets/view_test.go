@@ -1,6 +1,16 @@
 package widgets
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+
+	"github.com/eqms/ctop/search"
+)
+
+func base(q string) *search.Matcher {
+	m, _ := search.New(search.Base, q)
+	return m
+}
 
 func TestSplitEmptyLine(t *testing.T) {
 
@@ -50,7 +60,7 @@ func newTestView(lines ...string) *TextView {
 
 func TestFindNextOlderAndNewer(t *testing.T) {
 	v := newTestView("Error one", "ok", "error two", "ok", "ok", "ok", "ok")
-	v.SetSearch("ERROR")
+	v.SetSearch(base("ERROR"))
 	if !v.FindNext(true) || v.search.match != 2 {
 		t.Fatalf("expected match 2, got %d", v.search.match)
 	}
@@ -67,7 +77,7 @@ func TestFindNextOlderAndNewer(t *testing.T) {
 
 func TestPrependShiftsMatch(t *testing.T) {
 	v := newTestView("a", "match", "b")
-	v.SetSearch("match")
+	v.SetSearch(base("match"))
 	v.FindNext(true)
 	v.Prepend([]ToggleText{testLine("x"), testLine("y")})
 	if v.search.match != 3 {
@@ -76,7 +86,7 @@ func TestPrependShiftsMatch(t *testing.T) {
 }
 
 func TestMarks(t *testing.T) {
-	s := viewSearch{query: "ab", match: 1}
+	s := viewSearch{m: base("ab"), match: 1}
 	got := s.marks("xAbyab", 0)
 	want := []int{0, markMatch, markMatch, 0, markMatch, markMatch}
 	for i := range want {
@@ -102,18 +112,18 @@ func TestAttachKeepsNewerPending(t *testing.T) {
 func TestSearchTyping(t *testing.T) {
 	v := newTestView("alpha", "beta", "gamma", "x", "y", "z")
 	v.BeginTyping() // bottom line: "z" (5)
-	if !v.SearchTyping("a") || v.search.match != 2 {
+	if !v.SearchTyping(base("a")) || v.search.match != 2 {
 		t.Fatalf("expected closest older match 2, got %d", v.search.match)
 	}
-	if !v.SearchTyping("alp") || v.search.match != 0 {
+	if !v.SearchTyping(base("alp")) || v.search.match != 0 {
 		t.Fatalf("expected match 0, got %d", v.search.match)
 	}
-	if v.SearchTyping("nothing") || v.search.match != -1 || v.scroll != 0 {
+	if v.SearchTyping(base("nothing")) || v.search.match != -1 || v.scroll != 0 {
 		t.Fatalf("expected no match and the starting position")
 	}
-	v.SearchTyping("beta")
+	v.SearchTyping(base("beta"))
 	v.CancelTyping()
-	if v.search.query != "" || v.scroll != 0 {
+	if v.search.m != nil || v.scroll != 0 {
 		t.Fatalf("cancel did not reset the search")
 	}
 }
@@ -173,5 +183,109 @@ func TestTimestampRunes(t *testing.T) {
 		if got := timestampRunes(line); got != want {
 			t.Errorf("timestampRunes(%q) = %d, want %d", line, got, want)
 		}
+	}
+}
+
+func TestSplitLineRunes(t *testing.T) {
+	cases := []struct {
+		line string
+		size int
+		want []string
+	}{
+		{"perché così", 6, []string{"perché", " così"}},
+		{"àèìòù", 2, []string{"àè", "ìò", "ù"}},
+		{"日本語", 4, []string{"日本", "語"}},  // wide runes: 2 cells each
+		{"a日本", 2, []string{"a", "日", "本"}}, // a wide rune never straddles two rows
+		{"日", 1, []string{"日"}},             // too wide for a row: alone on it
+	}
+	for _, c := range cases {
+		got := splitLine(c.line, c.size)
+		if len(got) != len(c.want) {
+			t.Fatalf("splitLine(%q, %d) = %q, want %q", c.line, c.size, got, c.want)
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Fatalf("splitLine(%q, %d) = %q, want %q", c.line, c.size, got, c.want)
+			}
+		}
+	}
+}
+
+func manyLines(n int, prefix string) []ToggleText {
+	lines := make([]ToggleText, n)
+	for i := range lines {
+		lines[i] = testLine(fmt.Sprintf("%s%d", prefix, i))
+	}
+	return lines
+}
+
+func TestAppendDropsOldest(t *testing.T) {
+	v := newTestView()
+	v.Append(manyLines(maxLines+trimSlack+1, "l"))
+	if len(v.Text) != maxLines {
+		t.Fatalf("%d lines kept, want %d", len(v.Text), maxLines)
+	}
+	if got := v.Text[len(v.Text)-1].Toggle(false); got != fmt.Sprintf("l%d", maxLines+trimSlack) {
+		t.Fatalf("newest line %q dropped", got)
+	}
+}
+
+func TestPrependDropsNewestAndDetaches(t *testing.T) {
+	v := newTestView("tail")
+	v.SetSearch(base("tail"))
+	v.FindNext(true)
+	v.Prepend(manyLines(maxLines+trimSlack, "old"))
+	if len(v.Text) != maxLines || !v.Detached() {
+		t.Fatalf("%d lines, detached=%v; want %d lines, detached", len(v.Text), v.Detached(), maxLines)
+	}
+	if v.search.match != -1 {
+		t.Fatalf("match %d on a dropped line", v.search.match)
+	}
+	if line, run, loaded := v.Edge(false, func(a, b ToggleText) bool { return a == b }); line.Toggle(false) != "old0" || run != 1 || loaded != maxLines {
+		t.Fatalf("Edge = %v %d %d", line, run, loaded)
+	}
+}
+
+func TestEdgeRun(t *testing.T) {
+	v := newTestView("a1", "a2", "b", "c1", "c2", "c3")
+	sameFirst := func(a, b ToggleText) bool { return a.Toggle(false)[0] == b.Toggle(false)[0] }
+	if _, run, _ := v.Edge(false, sameFirst); run != 2 {
+		t.Fatalf("oldest run %d, want 2", run)
+	}
+	if line, run, _ := v.Edge(true, sameFirst); run != 3 || line.Toggle(false) != "c3" {
+		t.Fatalf("newest %v run %d, want c3 3", line, run)
+	}
+}
+
+func TestFindNewerAfterReplace(t *testing.T) {
+	v := newTestView("x")
+	v.SetSearch(base("hit"))
+	v.Replace([]ToggleText{testLine("a"), testLine("hit 1"), testLine("b"), testLine("c"), testLine("d"), testLine("hit 2")})
+	if !v.FindNext(false) || v.search.match != 1 {
+		t.Fatalf("newer search after Replace: match %d, want 1", v.search.match)
+	}
+}
+
+func TestKeyRows(t *testing.T) {
+	v := newTestView()
+	v.Width = 40
+	v.keys = []KeyHelp{{Key: "a", Label: "one"}, {Key: "b", Label: "two"}}
+	if r := v.keyRowsLocked(); r != KeyHelpRows {
+		t.Fatalf("%d rows for two short keys, want %d", r, KeyHelpRows)
+	}
+	for i := 0; i < 10; i++ {
+		v.keys = append(v.keys, KeyHelp{Key: "Key", Label: "a long label"})
+	}
+	if r := v.keyRowsLocked(); r != KeyHelpRows+1 {
+		t.Fatalf("%d rows for keys that do not fit in two, want %d", r, KeyHelpRows+1)
+	}
+}
+
+func TestMarksWholeWordAccents(t *testing.T) {
+	m, _ := search.New(search.WholeWord, "è")
+	s := viewSearch{m: m, match: -1}
+	got := s.marks("è perché", 0)
+	if got[0] != markMatch || got[len(got)-1] != 0 {
+		t.Fatalf("marks = %v: only the first è is a whole word", got)
 	}
 }

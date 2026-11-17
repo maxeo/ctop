@@ -14,8 +14,16 @@ type ToggleText interface {
 	Toggle(on bool) string
 }
 
-// most live lines kept aside while the view is detached from the tail
-const maxPending = 10000
+const (
+	// most live lines kept aside while the view is detached from the tail
+	maxPending = 10000
+	// most lines kept in memory: past it, the lines furthest from the ones
+	// shown are dropped, and loaded again from the log when needed
+	maxLines = 50000
+	// lines allowed past maxLines before trimming, so that trimming (a
+	// copy of the whole slice) does not run at every new line
+	trimSlack = maxLines / 10
+)
 
 // TextView shows a scrollable window of text lines.
 //
@@ -179,8 +187,46 @@ func (t *TextView) Prepend(lines []ToggleText) {
 		t.search.match += len(lines)
 	}
 	t.search.anchor += len(lines)
+	if len(t.Text) > maxLines+trimSlack {
+		t.dropNewestLocked(len(t.Text) - maxLines)
+	}
 	t.mu.Unlock()
 	t.requestRender()
+}
+
+// dropNewestLocked drops the n newest lines, below the ones shown. The view
+// no longer reaches the tail: it is detached, and the lines are loaded again
+// when the user scrolls down to them.
+func (t *TextView) dropNewestLocked(n int) {
+	keep := len(t.Text) - n
+	t.scroll -= t.added(t.Text[keep:])
+	if t.scroll < 0 {
+		t.scroll = 0
+	}
+	t.Text = append([]ToggleText(nil), t.Text[:keep]...)
+	t.detached = true
+	if t.search.match >= keep {
+		t.search.match = -1
+	}
+	if t.search.anchor >= keep {
+		t.search.anchor = keep - 1
+	}
+}
+
+// dropOldestLocked drops the n oldest lines, above the ones shown. They are
+// loaded again when the user scrolls up to them.
+func (t *TextView) dropOldestLocked(n int) {
+	t.Text = append([]ToggleText(nil), t.Text[n:]...)
+	if t.search.match >= 0 {
+		t.search.match -= n
+		if t.search.match < 0 {
+			t.search.match = -1
+		}
+	}
+	t.search.anchor -= n
+	if t.search.anchor < 0 {
+		t.search.anchor = 0
+	}
 }
 
 // Append adds newer lines after the current ones while detached. The visible
@@ -207,6 +253,8 @@ func (t *TextView) Replace(lines []ToggleText) {
 	t.detached = true
 	t.scroll = 0
 	t.search.match = -1
+	// until the next layout, the lines on screen are unknown
+	t.TextOut, t.outSrc, t.outFirst = nil, nil, nil
 	t.mu.Unlock()
 	t.requestRender()
 }
@@ -231,6 +279,9 @@ func (t *TextView) Attach(lines []ToggleText, keep func(ToggleText) bool) {
 
 func (t *TextView) appendLocked(lines []ToggleText) {
 	t.Text = append(t.Text, lines...)
+	if len(t.Text) > maxLines+trimSlack {
+		t.dropOldestLocked(len(t.Text) - maxLines)
+	}
 	switch {
 	case t.scroll == 0 && !t.detached:
 		// following: the new lines push the old ones up
@@ -262,24 +313,25 @@ func (t *TextView) Detached() bool {
 	return t.detached
 }
 
-// Oldest returns the oldest loaded line (nil if none) and how many lines are loaded.
-func (t *TextView) Oldest() (ToggleText, int) {
+// Edge returns the oldest loaded line (the newest one if newest), how many
+// lines at that end are the same as it for same (itself included), and how
+// many lines are loaded. line is nil if none is loaded.
+func (t *TextView) Edge(newest bool, same func(a, b ToggleText) bool) (line ToggleText, run, loaded int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if len(t.Text) == 0 {
-		return nil, 0
+	n := len(t.Text)
+	if n == 0 {
+		return nil, 0, 0
 	}
-	return t.Text[0], len(t.Text)
-}
-
-// Newest returns the newest loaded line (nil if none).
-func (t *TextView) Newest() ToggleText {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if len(t.Text) == 0 {
-		return nil
+	i, step := 0, 1
+	if newest {
+		i, step = n-1, -1
 	}
-	return t.Text[len(t.Text)-1]
+	line = t.Text[i]
+	for ; i >= 0 && i < n && same(line, t.Text[i]); i += step {
+		run++
+	}
+	return line, run, n
 }
 
 // ScrollToTop shows the oldest loaded line.
@@ -384,7 +436,7 @@ func (t *TextView) requestRender() {
 }
 
 func (t *TextView) textHeight() int {
-	h := t.Height - titleRows - footerRows
+	h := t.Height - titleRows - 1 - t.keyRowsLocked()
 	if h < 1 {
 		h = 1
 	}
@@ -526,21 +578,26 @@ func (t *TextView) readInputLoop() {
 	}()
 }
 
+// splitLine wraps line into rows of at most lineSize terminal cells. It
+// splits between runes, never inside one, and counts wide runes (CJK, most
+// emoji) as two cells: one that does not fit goes to the next row.
 func splitLine(line string, lineSize int) []string {
 	if line == "" {
 		return []string{}
 	}
-	if lineSize < 1 {
+	if lineSize < 1 || runewidth.StringWidth(line) <= lineSize {
 		return []string{line}
 	}
 
 	var lines []string
-	for {
-		if len(line) <= lineSize {
-			lines = append(lines, line)
-			return lines
+	start, width := 0, 0
+	for i, ch := range line {
+		w := runewidth.RuneWidth(ch)
+		if width+w > lineSize && i > start {
+			lines = append(lines, line[start:i])
+			start, width = i, 0
 		}
-		lines = append(lines, line[:lineSize])
-		line = line[lineSize:]
+		width += w
 	}
+	return append(lines, line[start:])
 }

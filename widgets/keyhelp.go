@@ -42,6 +42,22 @@ func drawKeyHelp(buf ui.Buffer, x, y, width, rows int, keys []KeyHelp, fg, bg ui
 	}
 }
 
+// keyHelpFits reports whether drawKeyHelp shows every key and label whole
+// in the given rows.
+func keyHelpFits(keys []KeyHelp, width, rows int) bool {
+	if len(keys) == 0 {
+		return true
+	}
+	cols := (len(keys) + rows - 1) / rows
+	colWidth := width / cols
+	for _, k := range keys {
+		if runewidth.StringWidth(k.Key)+1+runewidth.StringWidth(k.Label) > colWidth-1 {
+			return false
+		}
+	}
+	return true
+}
+
 // drawText draws s from x on row y, stopping before end, and returns the next x.
 func drawText(buf ui.Buffer, x, y, end int, s string, fg, bg ui.Attribute) int {
 	for _, ch := range s {
