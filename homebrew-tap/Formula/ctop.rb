@@ -8,20 +8,20 @@
 class Ctop < Formula
   desc "Top-like interface for container metrics"
   homepage "https://github.com/maxeo/ctop"
-  version "0.8.11"
+  version "0.8.12"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/maxeo/ctop/releases/download/v#{version}/ctop-#{version}-darwin-arm64"
-      sha256 "5ee210be12700b0990a1b015442aacb3f289cfdd9ac7ab5279655c24150b288f"
+      sha256 "d7dd3d90a8f1ed34f862516cd2da66241111a53ef747f40c042248e0a7f1c5c4"
 
       def install
         bin.install "ctop-#{version}-darwin-arm64" => "ctop"
       end
     else
       url "https://github.com/maxeo/ctop/releases/download/v#{version}/ctop-#{version}-darwin-amd64"
-      sha256 "5bdb55e71f992eb508e10a52f4a93b05528f9d939ab7bed4820d995ac0cc1efa"
+      sha256 "6167e5d2aa763e9bb367b3989f6fbdec517f4613cc27397d78db48b8272b7f08"
 
       def install
         bin.install "ctop-#{version}-darwin-amd64" => "ctop"
@@ -32,14 +32,14 @@ class Ctop < Formula
   on_linux do
     if Hardware::CPU.arm?
       url "https://github.com/maxeo/ctop/releases/download/v#{version}/ctop-#{version}-linux-arm64"
-      sha256 "2c9735b97008ab17abdd1cfff5b42015fb86e03a6d8f776f3164314b2ff53ecc"
+      sha256 "17f9f95bbd773c6f19ae557ae796d305de08ec5820ec78c36778e2cefd28bc00"
 
       def install
         bin.install "ctop-#{version}-linux-arm64" => "ctop"
       end
     else
       url "https://github.com/maxeo/ctop/releases/download/v#{version}/ctop-#{version}-linux-amd64"
-      sha256 "bd94faf33d88e66eec35b0d94068e82edc743405373a8e17894c3f903c090f75"
+      sha256 "ae8697b35ab93806627abad2156fd3f301f3e001f047ae165ac01ec791a558bf"
 
       def install
         bin.install "ctop-#{version}-linux-amd64" => "ctop"
