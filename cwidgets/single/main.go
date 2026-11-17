@@ -1,6 +1,7 @@
 package single
 
 import (
+	"github.com/eqms/ctop/cwidgets"
 	"github.com/eqms/ctop/logging"
 	"github.com/eqms/ctop/models"
 	ui "github.com/gizak/termui"
@@ -31,7 +32,7 @@ func NewSingle() *Single {
 		Mem:   NewMem(),
 		IO:    NewIO(),
 		Env:   NewEnv(),
-		Width: ui.TermWidth(),
+		Width: cwidgets.TermWidth(),
 	}
 }
 
@@ -44,7 +45,7 @@ func (e *Single) Up() {
 }
 
 func (e *Single) Down() {
-	if e.Y > (ui.TermHeight() - e.GetHeight()) {
+	if e.Y > (cwidgets.TermHeight() - e.GetHeight()) {
 		e.Y--
 		e.Align()
 		ui.Render(e)
@@ -82,7 +83,7 @@ func (e *Single) GetHeight() (h int) {
 
 func (e *Single) Align() {
 	// reset offset if needed
-	if e.GetHeight() <= ui.TermHeight() {
+	if e.GetHeight() <= cwidgets.TermHeight() {
 		e.Y = 0
 	}
 

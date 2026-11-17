@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
 )
 
@@ -68,11 +69,11 @@ func (sl *StatusLine) Buffer() ui.Buffer {
 }
 
 func (sl *StatusLine) Align() {
-	sl.bg.SetWidth(ui.TermWidth() - 1)
-	sl.Message.SetWidth(ui.TermWidth() - 2)
+	sl.bg.SetWidth(cwidgets.TermWidth() - 1)
+	sl.Message.SetWidth(cwidgets.TermWidth() - 2)
 
-	sl.bg.Y = ui.TermHeight() - 1
-	sl.Message.Y = ui.TermHeight() - 1
+	sl.bg.Y = cwidgets.TermHeight() - 1
+	sl.Message.Y = cwidgets.TermHeight() - 1
 }
 
 func (sl *StatusLine) Height() int { return statusHeight }

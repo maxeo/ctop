@@ -51,10 +51,17 @@ func (l *DockerLogs) Stream() chan models.Log {
 			if len(parts) == 0 {
 				continue
 			}
+			var entry models.Log
 			if len(parts) < 2 {
-				logCh <- models.Log{Timestamp: l.parseTime(""), Message: parts[0]}
+				entry = models.Log{Timestamp: l.parseTime(""), Message: parts[0]}
 			} else {
-				logCh <- models.Log{Timestamp: l.parseTime(parts[0]), Message: parts[1]}
+				entry = models.Log{Timestamp: l.parseTime(parts[0]), Message: parts[1]}
+			}
+			// don't block forever once the reader is gone
+			select {
+			case logCh <- entry:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -62,6 +69,7 @@ func (l *DockerLogs) Stream() chan models.Log {
 	// connect to container log stream
 	go func() {
 		err := l.client.Logs(opts)
+		w.Close() // unblock the scanner goroutine
 		if err != nil {
 			log.Errorf("error reading container logs: %s", err)
 		}

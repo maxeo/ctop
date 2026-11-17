@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
 )
 
@@ -55,6 +56,6 @@ func (w *ErrorView) Buffer() ui.Buffer {
 }
 
 func (w *ErrorView) Resize() {
-	w.Height = ui.TermHeight() - (w.PaddingTop + w.PaddingBottom)
-	w.SetWidth(ui.TermWidth() - (w.PaddingLeft + w.PaddingRight))
+	w.Height = cwidgets.TermHeight() - (w.PaddingTop + w.PaddingBottom)
+	w.SetWidth(cwidgets.TermWidth() - (w.PaddingLeft + w.PaddingRight))
 }

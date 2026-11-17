@@ -3,6 +3,7 @@ package single
 import (
 	"time"
 
+	"github.com/eqms/ctop/cwidgets"
 	"github.com/eqms/ctop/models"
 	ui "github.com/gizak/termui"
 )
@@ -44,10 +45,10 @@ type Logs struct {
 
 func NewLogs(stream chan models.Log) *Logs {
 	p := ui.NewList()
-	p.Y = ui.TermHeight() / 2
+	p.Y = cwidgets.TermHeight() / 2
 	p.X = 0
-	p.Height = ui.TermHeight() - p.Y
-	p.Width = ui.TermWidth()
+	p.Height = cwidgets.TermHeight() - p.Y
+	p.Width = cwidgets.TermWidth()
 	//p.Overflow = "wrap"
 	p.ItemFgColor = ui.ThemeAttr("par.text.fg")
 	i := &Logs{p, NewLogLines(4098)}

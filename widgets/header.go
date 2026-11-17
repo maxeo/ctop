@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
 )
 
@@ -37,7 +38,7 @@ func (c *CTopHeader) Buffer() ui.Buffer {
 }
 
 func (c *CTopHeader) Align() {
-	c.bg.SetWidth(ui.TermWidth() - 1)
+	c.bg.SetWidth(cwidgets.TermWidth() - 1)
 	c.alignVersion()
 }
 
@@ -74,7 +75,7 @@ func (c *CTopHeader) SetVersion(v string) {
 
 func (c *CTopHeader) alignVersion() {
 	if len(c.Version.Text) > 0 {
-		c.Version.SetX(ui.TermWidth() - len(c.Version.Text) - 4)
+		c.Version.SetX(cwidgets.TermWidth() - len(c.Version.Text) - 4)
 	}
 }
 

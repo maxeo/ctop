@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/eqms/ctop/config"
+	"github.com/eqms/ctop/cwidgets"
 	"github.com/eqms/ctop/cwidgets/single"
 	ui "github.com/gizak/termui"
 	tm "github.com/nsf/termbox-go"
@@ -33,8 +34,8 @@ func ShowConnError(err error) (exit bool) {
 	})
 
 	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
+		tm.Clear(tm.ColorDefault, tm.ColorDefault) // also refreshes termbox's cached size
 		errView.Resize()
-		tm.Clear(tm.ColorDefault, tm.ColorDefault)
 		ui.Render(errView)
 		log.Infof("RESIZE")
 	})
@@ -101,7 +102,8 @@ func SingleView() MenuFn {
 
 	ui.Handle("/timer/1s", func(ui.Event) { ui.Render(ex) })
 	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
-		ex.SetWidth(ui.TermWidth())
+		tm.Clear(tm.ColorDefault, tm.ColorDefault) // also refreshes termbox's cached size
+		ex.SetWidth(cwidgets.TermWidth())
 		ex.Align()
 		log.Infof("resize: width=%v max-rows=%v", ex.Width, cGrid.MaxRows())
 	})
@@ -127,7 +129,7 @@ func Display() bool {
 	var menu MenuFn
 	var connErr error
 
-	cGrid.SetWidth(ui.TermWidth())
+	cGrid.SetWidth(cwidgets.TermWidth())
 	ui.DefaultEvtStream.Hook(logEvent)
 
 	// initial draw
@@ -225,10 +227,11 @@ func Display() bool {
 	})
 
 	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
+		tm.Clear(tm.ColorDefault, tm.ColorDefault) // also refreshes termbox's cached size
 		header.Align()
 		status.Align()
 		cursor.ScrollPage()
-		cGrid.SetWidth(ui.TermWidth())
+		cGrid.SetWidth(cwidgets.TermWidth())
 		log.Infof("resize: width=%v max-rows=%v", cGrid.Width, cGrid.MaxRows())
 		RedrawRows(true)
 	})

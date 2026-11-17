@@ -1,6 +1,7 @@
 package compact
 
 import (
+	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
 )
 
@@ -46,7 +47,7 @@ func (cg *CompactGrid) GetHeight() int { return len(cg.Rows) + cg.header.Height 
 func (cg *CompactGrid) SetX(x int)     { cg.X = x }
 func (cg *CompactGrid) SetY(y int)     { cg.Y = y }
 func (cg *CompactGrid) SetWidth(w int) { cg.Width = w }
-func (cg *CompactGrid) MaxRows() int   { return ui.TermHeight() - cg.header.Height - cg.Y }
+func (cg *CompactGrid) MaxRows() int   { return cwidgets.TermHeight() - cg.header.Height - cg.Y }
 
 // calculate and return per-column width
 func (cg *CompactGrid) calcWidths() []int {
