@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"math"
 	"sync"
 
 	"github.com/eqms/ctop/cwidgets"
@@ -21,6 +22,7 @@ type TextView struct {
 	mu          sync.Mutex    // guards the fields below, shared by input, render and event goroutines
 	toggleState bool
 	scroll      int          // lines scrolled back from the bottom (0 = follow tail)
+	onTop       func()       // called when the user scrolls past the oldest loaded line
 	Text        []ToggleText // all the text
 	TextOut     []string     // text to be displayed
 	TextFgColor ui.Attribute
@@ -91,6 +93,60 @@ func (t *TextView) ScrollDown(n int) {
 	t.requestRender()
 }
 
+// SetOnTop registers f to be called (in its own goroutine) when the user tries
+// to scroll above the oldest loaded line, e.g. to load older history.
+func (t *TextView) SetOnTop(f func()) {
+	t.mu.Lock()
+	t.onTop = f
+	t.mu.Unlock()
+}
+
+// Prepend inserts older lines before the current ones. The visible lines
+// stay where they are; the user scrolls up to reach the new ones.
+func (t *TextView) Prepend(lines []ToggleText) {
+	if len(lines) == 0 {
+		return
+	}
+	t.mu.Lock()
+	t.Text = append(append([]ToggleText{}, lines...), t.Text...)
+	t.mu.Unlock()
+	t.requestRender()
+}
+
+// Oldest returns the oldest loaded line (nil if none) and how many lines are loaded.
+func (t *TextView) Oldest() (ToggleText, int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.Text) == 0 {
+		return nil, 0
+	}
+	return t.Text[0], len(t.Text)
+}
+
+// ScrollToTop shows the oldest loaded line.
+func (t *TextView) ScrollToTop() {
+	t.mu.Lock()
+	t.scroll = math.MaxInt32 // clamped by layout
+	t.mu.Unlock()
+	t.requestRender()
+}
+
+// ScrollToBottom shows the newest line and follows new output again.
+func (t *TextView) ScrollToBottom() {
+	t.mu.Lock()
+	t.scroll = 0
+	t.mu.Unlock()
+	t.requestRender()
+}
+
+// SetLabel changes the border label and redraws.
+func (t *TextView) SetLabel(label string) {
+	t.mu.Lock()
+	t.BorderLabel = label
+	t.mu.Unlock()
+	t.requestRender()
+}
+
 // PageSize returns the number of text lines visible at once.
 func (t *TextView) PageSize() int {
 	t.mu.Lock()
@@ -100,13 +156,13 @@ func (t *TextView) PageSize() int {
 
 func (t *TextView) Buffer() ui.Buffer {
 	var cell ui.Cell
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	buf := t.Block.Buffer()
 
 	x := t.Block.X + t.padding[0]
 	y := t.Block.Y + t.padding[1]
 
-	t.mu.Lock()
-	defer t.mu.Unlock()
 	for _, line := range t.TextOut {
 		for _, ch := range line {
 			cell = ui.Cell{Ch: ch, Fg: t.TextFgColor, Bg: t.TextBgColor}
@@ -138,18 +194,29 @@ func (t *TextView) textHeight() int {
 }
 
 // layout rebuilds TextOut for the current size, toggle state and scroll offset.
-func (t *TextView) layout() {
+// It reports whether the user scrolled up past the oldest loaded line.
+func (t *TextView) layout() (atTop bool) {
 	maxWidth := t.Width - (t.padding[0] * 2)
 	height := t.textHeight()
 	need := height + t.scroll
 
+	// collect wrapped lines newest first, then reverse once: prepending in
+	// the loop is quadratic and froze the view on logs with thousands of lines
 	var lines []string
-	for i := len(t.Text) - 1; i >= 0 && len(lines) < need; i-- {
-		lines = append(splitLine(t.Text[i].Toggle(t.toggleState), maxWidth), lines...)
+	i := len(t.Text) - 1
+	for ; i >= 0 && len(lines) < need; i-- {
+		wrapped := splitLine(t.Text[i].Toggle(t.toggleState), maxWidth)
+		for j := len(wrapped) - 1; j >= 0; j-- {
+			lines = append(lines, wrapped[j])
+		}
+	}
+	for l, r := 0, len(lines)-1; l < r; l, r = l+1, r-1 {
+		lines[l], lines[r] = lines[r], lines[l]
 	}
 
 	// clamp scroll to the available history
-	if max := len(lines) - height; t.scroll > max {
+	if max := len(lines) - height; t.scroll > 0 && t.scroll >= max && i < 0 {
+		atTop = true
 		if max < 0 {
 			max = 0
 		}
@@ -162,6 +229,7 @@ func (t *TextView) layout() {
 		start = 0
 	}
 	t.TextOut = lines[start:end]
+	return atTop
 }
 
 func (t *TextView) renderLoop() {
@@ -173,9 +241,13 @@ func (t *TextView) renderLoop() {
 				return
 			}
 			t.mu.Lock()
-			t.layout()
+			atTop := t.layout()
+			onTop := t.onTop
 			t.mu.Unlock()
 			ui.Render(t)
+			if atTop && onTop != nil {
+				go onTop()
+			}
 		}
 	}()
 }

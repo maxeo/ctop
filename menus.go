@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/eqms/ctop/config"
 	"github.com/eqms/ctop/container"
@@ -350,65 +348,6 @@ func ContainerMenu() MenuFn {
 	return nextMenu
 }
 
-// lines scrolled per mouse wheel notch in the log view
-const logWheelStep = 3
-
-func LogMenu() MenuFn {
-
-	c := cursor.Selected()
-	if c == nil {
-		return nil
-	}
-
-	ui.DefaultEvtStream.ResetHandlers()
-	defer ui.DefaultEvtStream.ResetHandlers()
-
-	logs, stop := logReader(c)
-	defer stop()
-	m := widgets.NewTextView(logs)
-	m.BorderLabel = fmt.Sprintf("Logs [%s]", c.GetMeta("name"))
-	ui.Render(m)
-
-	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
-		m.Resize()
-	})
-	ui.Handle("/sys/kbd/t", func(ui.Event) {
-		m.Toggle()
-	})
-	// Enable mouse reporting only here, so the wheel scrolls the log in any
-	// terminal (without it, many terminals scroll their own scrollback
-	// instead). Down stops at the newest line, where the view keeps
-	// following new output. Other mouse buttons are ignored.
-	tm.SetInputMode(tm.InputAlt | tm.InputMouse)
-	defer tm.SetInputMode(tm.InputAlt)
-	ui.Handle("/sys/mouse", func(e ui.Event) {
-		me, ok := e.Data.(ui.EvtMouse)
-		if !ok {
-			return
-		}
-		switch me.Press {
-		case "MouseWheelUp":
-			m.ScrollUp(logWheelStep)
-		case "MouseWheelDown":
-			m.ScrollDown(logWheelStep)
-		}
-	})
-	// Terminals that turn the wheel into <up>/<down> (alternate scroll mode)
-	// land here too.
-	HandleKeys("up", func() { m.ScrollUp(1) })
-	HandleKeys("down", func() { m.ScrollDown(1) })
-	HandleKeys("pgup", func() { m.ScrollUp(m.PageSize()) })
-	HandleKeys("pgdown", func() { m.ScrollDown(m.PageSize()) })
-	// Any other key closes the view. stop() is idempotent: several key
-	// events can arrive before the loop actually exits.
-	ui.Handle("/sys/kbd/", func(ui.Event) {
-		stop()
-		ui.StopLoop()
-	})
-	ui.Loop()
-	return nil
-}
-
 func ExecShell() MenuFn {
 	c := cursor.Selected()
 	if c == nil {
@@ -525,52 +464,6 @@ func Confirm(txt string, fn func()) MenuFn {
 		return nil
 	}
 	return menu
-}
-
-type toggleLog struct {
-	timestamp time.Time
-	message   string
-}
-
-func (t *toggleLog) Toggle(on bool) string {
-	if on {
-		return fmt.Sprintf("%s %s", t.timestamp.Format("2006-01-02T15:04:05.999Z07:00"), t.message)
-	}
-	return t.message
-}
-
-// logReader streams the container logs. stop is safe to call any number of
-// times; the first call stops the collector and closes logs.
-func logReader(container *container.Container) (logs chan widgets.ToggleText, stop func()) {
-
-	logCollector := container.Logs()
-	stream := logCollector.Stream()
-	logs = make(chan widgets.ToggleText)
-	quit := make(chan struct{})
-
-	var once sync.Once
-	stop = func() { once.Do(func() { close(quit) }) }
-
-	go func() {
-		defer close(logs)
-		defer logCollector.Stop()
-		for {
-			select {
-			case log, ok := <-stream:
-				if !ok {
-					return
-				}
-				select {
-				case logs <- &toggleLog{timestamp: log.Timestamp, message: log.Message}:
-				case <-quit:
-					return
-				}
-			case <-quit:
-				return
-			}
-		}
-	}()
-	return
 }
 
 func CommitMenu() MenuFn {

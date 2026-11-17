@@ -82,7 +82,7 @@ func (cm *Docker) watchEvents() {
 	events := make(chan *api.APIEvents)
 	opts := api.EventsOptions{Filters: map[string][]string{
 		"type":  {"container"},
-		"event": {"create", "start", "health_status", "pause", "unpause", "stop", "die", "destroy"},
+		"event": {"create", "rename", "start", "health_status", "pause", "unpause", "stop", "die", "destroy"},
 	},
 	}
 	if err := cm.client.AddEventListenerWithOptions(opts, events); err != nil {
@@ -101,9 +101,11 @@ func (cm *Docker) watchEvents() {
 				log.Debugf("handling docker event: action=health_status id=%s %s", e.ID, healthStatus)
 			}
 			cm.statuses <- StatusUpdate{e.ID, "health", healthStatus}
-		case "create":
+		// "rename" matters for `docker compose up`: it creates the new container
+		// under a temporary "<old id>_<name>" name and renames it afterwards
+		case "create", "rename":
 			if log.IsDebugEnabled() {
-				log.Debugf("handling docker event: action=create id=%s", e.ID)
+				log.Debugf("handling docker event: action=%s id=%s", actionName, e.ID)
 			}
 			cm.needsRefresh <- e.ID
 		case "destroy":

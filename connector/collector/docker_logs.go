@@ -2,13 +2,27 @@ package collector
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/eqms/ctop/models"
 	api "github.com/fsouza/go-dockerclient"
+)
+
+// ANSI escape sequences (colors, cursor moves) written by many containers,
+// e.g. Home Assistant: the log view shows plain text, so they are removed
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-Z\-_]`)
+
+const (
+	// lines loaded when the log view opens
+	logInitialTail = 20
+	// lines loaded per page when scrolling back
+	logPageSize = 200
 )
 
 type DockerLogs struct {
@@ -37,7 +51,7 @@ func (l *DockerLogs) Stream() chan models.Log {
 		//ErrorStream:  w,
 		Stdout:      true,
 		Stderr:      true,
-		Tail:        "20",
+		Tail:        strconv.Itoa(logInitialTail),
 		Follow:      true,
 		Timestamps:  true,
 		RawTerminal: true,
@@ -47,19 +61,9 @@ func (l *DockerLogs) Stream() chan models.Log {
 	go func() {
 		scanner := bufio.NewScanner(r)
 		for scanner.Scan() {
-			parts := strings.SplitN(scanner.Text(), " ", 2)
-			if len(parts) == 0 {
-				continue
-			}
-			var entry models.Log
-			if len(parts) < 2 {
-				entry = models.Log{Timestamp: l.parseTime(""), Message: parts[0]}
-			} else {
-				entry = models.Log{Timestamp: l.parseTime(parts[0]), Message: parts[1]}
-			}
 			// don't block forever once the reader is gone
 			select {
-			case logCh <- entry:
+			case logCh <- l.parseLine(scanner.Text()):
 			case <-ctx.Done():
 				return
 			}
@@ -86,6 +90,67 @@ func (l *DockerLogs) Stream() chan models.Log {
 }
 
 func (l *DockerLogs) Stop() { l.done <- true }
+
+// Older implements LogHistory. Docker cannot combine "tail" with "until"
+// (tail is applied first), so it asks for the last skip+page lines and keeps
+// the ones older than before.
+func (l *DockerLogs) Older(before time.Time, skip int) ([]models.Log, bool, error) {
+	tail := skip + logPageSize
+	older, fetched, err := l.readBefore(before, strconv.Itoa(tail))
+	if err != nil {
+		return nil, false, err
+	}
+	if len(older) > logPageSize {
+		older = older[len(older)-logPageSize:]
+	}
+	// fewer lines than requested: the whole log has been read
+	return older, fetched >= tail, nil
+}
+
+// AllBefore implements LogHistory.
+func (l *DockerLogs) AllBefore(before time.Time) ([]models.Log, error) {
+	older, _, err := l.readBefore(before, "all")
+	return older, err
+}
+
+// readBefore reads the last tail lines (non-following) and returns those
+// logged before the given time, plus how many lines were read in total.
+func (l *DockerLogs) readBefore(before time.Time, tail string) ([]models.Log, int, error) {
+	var buf bytes.Buffer
+	opts := api.LogsOptions{
+		Container:    l.id,
+		OutputStream: &buf,
+		Stdout:       true,
+		Stderr:       true,
+		Tail:         tail,
+		Timestamps:   true,
+		RawTerminal:  true,
+	}
+	if err := l.client.Logs(opts); err != nil {
+		return nil, 0, err
+	}
+
+	var older []models.Log
+	fetched := 0
+	scanner := bufio.NewScanner(&buf)
+	for scanner.Scan() {
+		fetched++
+		entry := l.parseLine(scanner.Text())
+		if entry.Timestamp.Before(before) {
+			older = append(older, entry)
+		}
+	}
+	return older, fetched, nil
+}
+
+func (l *DockerLogs) parseLine(line string) models.Log {
+	line = ansiEscape.ReplaceAllString(line, "")
+	parts := strings.SplitN(line, " ", 2)
+	if len(parts) < 2 {
+		return models.Log{Timestamp: l.parseTime(""), Message: parts[0]}
+	}
+	return models.Log{Timestamp: l.parseTime(parts[0]), Message: parts[1]}
+}
 
 func (l *DockerLogs) parseTime(s string) time.Time {
 	ts, err := time.Parse(time.RFC3339Nano, s)
