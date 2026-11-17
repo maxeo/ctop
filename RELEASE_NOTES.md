@@ -1,5 +1,20 @@
 # Release Notes
 
+## v0.8.10 (2026-11-17)
+
+### Log view
+- **Home shows the start of the log**: it reads the first 200 lines instead of loading the whole log; scrolling down loads the next pages until the view joins the newest lines and follows new output again. End goes back to the newest lines
+- **Search** with Ctrl+F or `/`: loaded lines are searched while you type, matches are highlighted, `n` / `N` move to the older / newer match, loading more of the log when no loaded line matches
+- **tail -f layout**: log lines use the whole width with no border, with a title bar on top and two rows of key help for the current mode at the bottom, like nano
+- **Scroll past the newest line**: blank rows below it make room for new lines, keeping at least 20 lines on screen
+- **Text selection mode**: a click or `s` leaves the mouse to the terminal, so click and drag selects and copies log lines; Esc or `s` goes back to the wheel scrolling the log
+- **Left / right arrows** close the log view, also in selection mode
+
+### Fixes
+- Esc did nothing in the log view: termbox's Alt input mode never reports a lone Esc
+- Backspace (0x7F) was ignored in the search prompt
+- Changing the mouse mode could race with a redraw and lose its escape sequence
+
 ## v0.8.9 (2026-11-17)
 
 ### Security

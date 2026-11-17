@@ -134,6 +134,20 @@ docker run --rm -ti \
 | <kbd>S</kbd> | Save current configuration to file |
 | <kbd>q</kbd> | Quit ctop |
 
+#### Log view
+
+| Key | Action |
+|:---:|--------|
+| Mouse wheel, <kbd>↑</kbd> <kbd>↓</kbd> | Scroll (older lines are loaded at the top; past the newest line, blank rows make room for new lines, keeping 20 lines on screen) |
+| <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Previous / next screen |
+| <kbd>Home</kbd> | Start of the log (later pages load as you scroll down) |
+| <kbd>End</kbd> | Newest lines, following new output |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> | Search: loaded lines are searched while you type, <kbd>Enter</kbd> keeps the search (and searches the whole log if no loaded line matches), <kbd>n</kbd> older match, <kbd>N</kbd> newer match, <kbd>Esc</kbd> to end |
+| Click or <kbd>s</kbd> | Text selection mode: the mouse is left to the terminal, so click and drag selects text (<kbd>s</kbd> or <kbd>Esc</kbd> to leave) |
+| <kbd>t</kbd> | Toggle timestamps |
+| <kbd>Esc</kbd> | End the search or the selection mode, otherwise close the log view |
+| <kbd>q</kbd>, <kbd>←</kbd> <kbd>→</kbd>, other keys | Close the log view |
+
 ### Config File
 
 While running, press <kbd>S</kbd> to save the current configuration:

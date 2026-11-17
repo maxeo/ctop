@@ -24,6 +24,10 @@ type LogHistory interface {
 	Older(before time.Time, skip int) (logs []models.Log, more bool, err error)
 	// AllBefore returns every line logged before the given time, oldest first.
 	AllBefore(before time.Time) ([]models.Log, error)
+	// Newer returns up to one page of lines logged after the given time,
+	// oldest first; a zero time means from the start of the log. more is
+	// false once the end of the log (at the time of the call) is reached.
+	Newer(after time.Time) (logs []models.Log, more bool, err error)
 }
 
 type Collector interface {

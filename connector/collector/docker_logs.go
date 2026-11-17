@@ -113,6 +113,60 @@ func (l *DockerLogs) AllBefore(before time.Time) ([]models.Log, error) {
 	return older, err
 }
 
+// Newer implements LogHistory. Docker has no "head" option: it reads the log
+// forward (from the second of after, via "since") and stops the request once
+// a page plus one line is read.
+func (l *DockerLogs) Newer(after time.Time) ([]models.Log, bool, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	r, w := io.Pipe()
+	opts := api.LogsOptions{
+		Context:      ctx,
+		Container:    l.id,
+		OutputStream: w,
+		Stdout:       true,
+		Stderr:       true,
+		Tail:         "all",
+		Timestamps:   true,
+		RawTerminal:  true,
+	}
+	if !after.IsZero() {
+		opts.Since = after.Unix()
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		err := l.client.Logs(opts)
+		w.Close()
+		errCh <- err
+	}()
+
+	var page []models.Log
+	more := false
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		entry := l.parseLine(scanner.Text())
+		if !after.IsZero() && !entry.Timestamp.After(after) {
+			continue
+		}
+		if len(page) == logPageSize {
+			more = true
+			break
+		}
+		page = append(page, entry)
+	}
+	if more {
+		cancel()
+		r.CloseWithError(context.Canceled) // unblock the writer
+		<-errCh
+		return page, true, nil
+	}
+	if err := <-errCh; err != nil {
+		return nil, false, err
+	}
+	return page, false, nil
+}
+
 // readBefore reads the last tail lines (non-following) and returns those
 // logged before the given time, plus how many lines were read in total.
 func (l *DockerLogs) readBefore(before time.Time, tail string) ([]models.Log, int, error) {
