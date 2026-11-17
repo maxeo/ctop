@@ -2,6 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/eqms/ctop/config"
@@ -11,74 +15,51 @@ import (
 	"github.com/eqms/ctop/widgets/menu"
 	ui "github.com/gizak/termui"
 	tm "github.com/nsf/termbox-go"
-	"github.com/pkg/browser"
 )
 
 // MenuFn executes a menu window, returning the next menu or nil
 type MenuFn func() MenuFn
 
-var helpDialog = []menu.Item{
-	{"<enter> - open container menu", ""},
-	{"", ""},
-	{"[a] - toggle display of all containers", ""},
-	{"[f] - filter displayed containers", ""},
-	{"[h] - open this help dialog", ""},
-	{"[H] - toggle ctop header", ""},
-	{"[s] - select container sort field", ""},
-	{"[r] - reverse container sort order", ""},
-	{"[o] - open single view", ""},
-	{"[l] - view container logs ([t] to toggle timestamp when open)", ""},
-	{"[e] - exec shell", ""},
-	{"[w] - open browser (first port is http)", ""},
-	{"[c] - configure columns", ""},
-	{"[S] - save current configuration to file", ""},
-	{"[q] - exit ctop", ""},
+// inputEscMode switches termbox to Esc input mode while a text input is
+// open and returns the function that switches back. In the Alt mode used by
+// the rest of ctop a lone Esc is never reported (termbox waits for the next
+// key and sends Alt+key), so Esc could not close the input.
+func inputEscMode() (restore func()) {
+	tm.SetInputMode(tm.InputEsc)
+	return func() { tm.SetInputMode(tm.InputAlt) }
 }
 
-func HelpMenu() MenuFn {
-	tm.Clear(tm.ColorDefault, tm.ColorDefault)
-	ui.DefaultEvtStream.ResetHandlers()
-	defer ui.DefaultEvtStream.ResetHandlers()
-
-	m := menu.NewMenu()
-	m.BorderLabel = "Help"
-	m.AddItems(helpDialog...)
-	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
-		tm.Clear(tm.ColorDefault, tm.ColorDefault)
-		ui.Render(m)
-	})
-	ui.Handle("/sys/kbd/", func(ui.Event) {
-		ui.StopLoop()
-	})
-	ui.Loop()
-	return nil
+// inputY places an input box at the bottom, above the key help and the
+// status line.
+func inputY(i *widgets.Input) int {
+	return cwidgets.TermHeight() - i.Height - cGrid.Bottom
 }
 
 func FilterMenu() MenuFn {
 	ui.DefaultEvtStream.ResetHandlers()
 	defer ui.DefaultEvtStream.ResetHandlers()
 
+	defer inputEscMode()()
+
 	i := widgets.NewInput()
 	i.BorderLabel = "Filter"
-	i.SetY(cwidgets.TermHeight() - i.Height)
+	i.SetY(inputY(i))
 	i.Data = config.GetVal("filterStr")
 	ui.Render(i)
 
 	// refresh container rows on input
-	stream := i.Stream()
-	go func() {
-		for s := range stream {
-			config.Update("filterStr", s)
-			_ = RefreshDisplay()
-			ui.Render(i)
-		}
-	}()
+	i.OnChange(func(s string) {
+		config.Update("filterStr", s)
+		_ = RefreshDisplay()
+	})
 
 	i.InputHandlers()
-	ui.Handle("/sys/kbd/<escape>", func(ui.Event) {
+	cancel := func(ui.Event) {
 		config.Update("filterStr", "")
 		ui.StopLoop()
-	})
+	}
+	ui.Handle("/sys/kbd/<escape>", cancel)
+	ui.Handle("/sys/kbd/C-c", cancel)
 	ui.Handle("/sys/kbd/<enter>", func(ui.Event) {
 		config.Update("filterStr", i.Data)
 		ui.StopLoop()
@@ -87,8 +68,33 @@ func FilterMenu() MenuFn {
 	return nil
 }
 
+// panelLoop runs the event loop of a panel below the container list: the
+// list keeps updating, and Esc, q and Ctrl+C call close.
+func panelLoop(close func()) {
+	defer inputEscMode()()
+	ui.Handle("/sys/kbd/q", func(ui.Event) { close() })
+	ui.Handle("/sys/kbd/C-c", func(ui.Event) { close() })
+	ui.Handle("/sys/kbd/<escape>", func(ui.Event) { close() })
+	ui.Handle("/timer/1s", func(ui.Event) { _ = RefreshDisplay() })
+	ui.Handle("/sys/wnd/resize", func(ui.Event) {
+		tm.Clear(tm.ColorDefault, tm.ColorDefault) // also refreshes termbox's cached size
+		header.Align()
+		cGrid.SetWidth(cwidgets.TermWidth())
+		RedrawRows(true)
+	})
+	ui.Loop()
+}
+
+var sortKeys = []widgets.KeyHelp{
+	{Key: "↑ ↓", Label: "Sort field"},
+	{Key: "r", Label: "Reverse"},
+	{Key: "Enter", Label: "Keep"},
+	{Key: "Esc", Label: "Cancel"},
+}
+
+// SortMenu picks the sort field below the container list: moving the cursor
+// sorts the list at once, Enter keeps the field, Esc goes back to the old one.
 func SortMenu() MenuFn {
-	tm.Clear(tm.ColorDefault, tm.ColorDefault)
 	ui.DefaultEvtStream.ResetHandlers()
 	defer ui.DefaultEvtStream.ResetHandlers()
 
@@ -96,28 +102,50 @@ func SortMenu() MenuFn {
 	m.Selectable = true
 	m.SortItems = true
 	m.BorderLabel = "Sort Field"
-
 	for _, field := range container.SortFields() {
-		m.AddItems(menu.Item{field, ""})
+		m.AddItems(menu.Item{Val: field})
 	}
 
-	// set cursor position to current sort field
-	m.SetCursor(config.GetVal("sortField"))
+	oldField := config.GetVal("sortField")
+	oldReversed := config.GetSwitchVal("sortReversed")
+	m.SetCursor(oldField)
 
-	HandleKeys("up", m.Up)
-	HandleKeys("down", m.Down)
-	HandleKeys("exit", ui.StopLoop)
+	hide := showPanel(m, sortKeys)
+	defer hide()
 
-	ui.Handle("/sys/kbd/<enter>", func(ui.Event) {
+	apply := func() {
 		config.Update("sortField", m.SelectedValue())
+		_ = RefreshDisplay()
+	}
+	HandleKeys("up", func() { m.Up(); apply() })
+	HandleKeys("down", func() { m.Down(); apply() })
+	ui.Handle("/sys/kbd/r", func(ui.Event) {
+		config.Toggle("sortReversed")
+		_ = RefreshDisplay()
+	})
+	ui.Handle("/sys/kbd/<enter>", func(ui.Event) { ui.StopLoop() })
+	ui.Handle("/sys/kbd/s", func(ui.Event) { ui.StopLoop() })
+
+	panelLoop(func() {
+		config.Update("sortField", oldField)
+		if config.GetSwitchVal("sortReversed") != oldReversed {
+			config.Toggle("sortReversed")
+		}
 		ui.StopLoop()
 	})
-
-	ui.Render(m)
-	ui.Loop()
 	return nil
 }
 
+var columnsKeys = []widgets.KeyHelp{
+	{Key: "↑ ↓", Label: "Select column"},
+	{Key: "Enter", Label: "Show / hide"},
+	{Key: "PgUp", Label: "Move left"},
+	{Key: "PgDn", Label: "Move right"},
+	{Key: "Esc", Label: "Close"},
+}
+
+// ColumnsMenu shows, hides and moves columns below the container list; the
+// list shows each change at once.
 func ColumnsMenu() MenuFn {
 	const (
 		enabledStr  = "[X]"
@@ -125,7 +153,6 @@ func ColumnsMenu() MenuFn {
 		padding     = 2
 	)
 
-	tm.Clear(tm.ColorDefault, tm.ColorDefault)
 	ui.DefaultEvtStream.ResetHandlers()
 	defer ui.DefaultEvtStream.ResetHandlers()
 
@@ -133,7 +160,6 @@ func ColumnsMenu() MenuFn {
 	m.Selectable = true
 	m.SortItems = false
 	m.BorderLabel = "Columns"
-	m.SubText = "Re-order: <Page Up> / <Page Down>"
 
 	rebuild := func() {
 		// get padding for right alignment of enabled status
@@ -154,50 +180,47 @@ func ColumnsMenu() MenuFn {
 			} else {
 				txt += disabledStr
 			}
-			m.AddItems(menu.Item{col.Name, txt})
+			m.AddItems(menu.Item{Val: col.Name, Label: txt})
 		}
 	}
 
-	upFn := func() {
-		config.ColumnLeft(m.SelectedValue())
-		m.Up()
+	// recreate the container rows with the new columns
+	update := func() {
 		rebuild()
-	}
-
-	downFn := func() {
-		config.ColumnRight(m.SelectedValue())
-		m.Down()
-		rebuild()
-	}
-
-	toggleFn := func() {
-		config.ColumnToggle(m.SelectedValue())
-		rebuild()
-	}
-
-	rebuild()
-
-	HandleKeys("up", m.Up)
-	HandleKeys("down", m.Down)
-	HandleKeys("enter", toggleFn)
-	HandleKeys("pgup", upFn)
-	HandleKeys("pgdown", downFn)
-
-	ui.Handle("/sys/kbd/x", func(ui.Event) { toggleFn() })
-	ui.Handle("/sys/kbd/<enter>", func(ui.Event) { toggleFn() })
-
-	HandleKeys("exit", func() {
-		cSource, err := cursor.cSuper.Get()
-		if err == nil {
+		if cSource, err := cursor.cSuper.Get(); err == nil {
 			for _, c := range cSource.All() {
 				c.RecreateWidgets()
 			}
 		}
-		ui.StopLoop()
-	})
+		RedrawRows(true)
+	}
 
-	ui.Render(m)
-	ui.Loop()
+	rebuild()
+	hide := showPanel(m, columnsKeys)
+	defer hide()
+
+	toggle := func() {
+		config.ColumnToggle(m.SelectedValue())
+		update()
+	}
+	HandleKeys("up", m.Up)
+	HandleKeys("down", m.Down)
+	HandleKeys("pgup", func() {
+		config.ColumnLeft(m.SelectedValue())
+		m.Up()
+		update()
+	})
+	HandleKeys("pgdown", func() {
+		config.ColumnRight(m.SelectedValue())
+		m.Down()
+		update()
+	})
+	ui.Handle("/sys/kbd/x", func(ui.Event) { toggle() })
+	ui.Handle("/sys/kbd/<space>", func(ui.Event) { toggle() })
+	ui.Handle("/sys/kbd/<enter>", func(ui.Event) { toggle() })
+	ui.Handle("/sys/kbd/c", func(ui.Event) { ui.StopLoop() })
+
+	panelLoop(ui.StopLoop)
 	return nil
 }
 
@@ -403,11 +426,63 @@ func OpenInBrowser() MenuFn {
 
 	webPort := c.Meta.Get("Web Port")
 	if webPort == "" {
+		log.Statusf("%s has no published TCP port to open", c.GetMeta("name"))
 		return nil
 	}
-	link := "http://" + webPort + "/"
-	_ = browser.OpenURL(link)
+	link := webURL(webPort)
+	if !canOpenBrowser() {
+		log.Statusf("open %s in your browser", link)
+		return nil
+	}
+	if err := startBrowser(link); err != nil {
+		log.Statusf("cannot open a browser here, open %s", link)
+	}
 	return nil
+}
+
+// startBrowser opens url without waiting for the browser. Its output goes to
+// /dev/null: the browser (e.g. Chromium) would otherwise write its errors
+// over the screen ctop is drawing on.
+func startBrowser(url string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	// nil Stdin, Stdout and Stderr are connected to the null device
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
+}
+
+// webURL returns the URL of a published port. Over SSH, "localhost" is the
+// remote host, so it is replaced with the address the SSH client connected to.
+func webURL(hostPort string) string {
+	host, port, err := net.SplitHostPort(hostPort)
+	if err == nil && host == "localhost" {
+		if f := strings.Fields(os.Getenv("SSH_CONNECTION")); len(f) == 4 {
+			hostPort = net.JoinHostPort(f[2], port)
+		}
+	}
+	return "http://" + hostPort + "/"
+}
+
+// canOpenBrowser tells whether a browser can open on this screen: not over
+// SSH, and on Linux only with a graphical session.
+func canOpenBrowser() bool {
+	if os.Getenv("SSH_CONNECTION") != "" || os.Getenv("SSH_TTY") != "" {
+		return false
+	}
+	if runtime.GOOS == "linux" {
+		return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != ""
+	}
+	return true
 }
 
 // Create a confirmation dialog with a given description string and
@@ -479,25 +554,19 @@ func CommitMenu() MenuFn {
 	name := strings.ReplaceAll(c.GetMeta("name"), "/", "-")
 	suggested := fmt.Sprintf("%s-snapshot", name)
 
+	defer inputEscMode()()
+
 	i := widgets.NewInput()
 	i.BorderLabel = "Commit as Image"
 	i.SetMaxLen(60)
-	i.SetY(cwidgets.TermHeight() - i.Height)
+	i.SetY(inputY(i))
 	i.Data = suggested
 	ui.Render(i)
 
-	stream := i.Stream()
-	go func() {
-		for range stream {
-			ui.Render(i)
-		}
-	}()
-
 	var imageName string
 	i.InputHandlers()
-	ui.Handle("/sys/kbd/<escape>", func(ui.Event) {
-		ui.StopLoop()
-	})
+	ui.Handle("/sys/kbd/<escape>", func(ui.Event) { ui.StopLoop() })
+	ui.Handle("/sys/kbd/C-c", func(ui.Event) { ui.StopLoop() })
 	ui.Handle("/sys/kbd/<enter>", func(ui.Event) {
 		imageName = i.Data
 		ui.StopLoop()

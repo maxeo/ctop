@@ -19,7 +19,7 @@ type Input struct {
 	MaxLen      int
 	TextFgColor ui.Attribute
 	TextBgColor ui.Attribute
-	stream      chan string // stream text as it changes
+	onChange    func(string) // called with the text after each change
 	padding     Padding
 }
 
@@ -64,30 +64,35 @@ func (i *Input) Buffer() ui.Buffer {
 	return buf
 }
 
-func (i *Input) Stream() chan string {
-	i.stream = make(chan string)
-	return i.stream
+// OnChange registers f, called on the event loop with the text after each
+// change. (It replaces a channel that KeyPress fed synchronously: a slow
+// reader blocked the whole event loop.)
+func (i *Input) OnChange(f func(string)) {
+	i.onChange = f
 }
 
 func (i *Input) KeyPress(e ui.Event) {
 	ch := strings.ReplaceAll(e.Path, "/sys/kbd/", "")
-	if ch == "C-8" {
-		idx := len(i.Data) - 1
-		if idx > -1 {
-			i.Data = i.Data[0:idx]
-			i.stream <- i.Data
+	switch {
+	case ch == "C-8" || ch == "<backspace>": // 0x7F or 0x08, depending on the terminal
+		if len(i.Data) == 0 {
+			return
 		}
-		ui.Render(i)
-		return
-	}
-	if len(i.Data) >= i.MaxLen {
-		return
-	}
-	if strings.Contains(input_chars, ch) {
+		i.Data = i.Data[:len(i.Data)-1]
+	case ch == "C-u":
+		if i.Data == "" {
+			return
+		}
+		i.Data = ""
+	case len(ch) == 1 && strings.Contains(input_chars, ch) && len(i.Data) < i.MaxLen:
 		i.Data += ch
-		i.stream <- i.Data
-		ui.Render(i)
+	default:
+		return
 	}
+	if i.onChange != nil {
+		i.onChange(i.Data)
+	}
+	ui.Render(i)
 }
 
 // Setup some default handlers for menu navigation

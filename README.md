@@ -124,13 +124,14 @@ docker run --rm -ti \
 | <kbd>a</kbd> | Toggle display of all containers |
 | <kbd>f</kbd> | Filter displayed containers (<kbd>Esc</kbd> to clear) |
 | <kbd>H</kbd> | Toggle ctop header |
-| <kbd>h</kbd> | Open help dialog |
-| <kbd>s</kbd> | Select container sort field |
+| <kbd>h</kbd> | Show / hide every key below the container list |
+| <kbd>s</kbd> | Select container sort field below the list (the list is sorted while you move, <kbd>Enter</kbd> keeps it, <kbd>Esc</kbd> goes back) |
 | <kbd>r</kbd> | Reverse container sort order |
 | <kbd>o</kbd> | Open single view |
-| <kbd>l</kbd> | View container logs (<kbd>t</kbd> to toggle timestamp) |
+| <kbd>l</kbd> | View container logs (<kbd>t</kbd> to show Docker's timestamp) |
 | <kbd>e</kbd> | Exec shell |
-| <kbd>c</kbd> | Configure columns |
+| <kbd>w</kbd> | Open the lowest published TCP port in a browser (over SSH, the URL is shown instead) |
+| <kbd>c</kbd> | Configure columns below the list (changes show at once) |
 | <kbd>S</kbd> | Save current configuration to file |
 | <kbd>q</kbd> | Quit ctop |
 
@@ -141,7 +142,7 @@ docker run --rm -ti \
 | Mouse wheel, <kbd>↑</kbd> <kbd>↓</kbd> | Scroll (older lines are loaded at the top; past the newest line, blank rows make room for new lines, keeping 20 lines on screen) |
 | <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Previous / next screen |
 | <kbd>Home</kbd> | Start of the log (later pages load as you scroll down) |
-| <kbd>End</kbd> | Newest lines, following new output |
+| <kbd>End</kbd> | Newest lines, following new output (shown as if scrolled past the end: the last 20 lines on top, room for new ones below) |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> | Search: loaded lines are searched while you type, <kbd>Enter</kbd> keeps the search (and searches the whole log if no loaded line matches), <kbd>n</kbd> older match, <kbd>N</kbd> newer match, <kbd>Esc</kbd> to end |
 | Click or <kbd>s</kbd> | Text selection mode: the mouse is left to the terminal, so click and drag selects text (<kbd>s</kbd> or <kbd>Esc</kbd> to leave) |
 | <kbd>t</kbd> | Toggle timestamps |

@@ -47,7 +47,7 @@ func (l *DockerLogs) Stream() chan models.Log {
 	opts := api.LogsOptions{
 		Context:      ctx,
 		Container:    l.id,
-		OutputStream: w,
+		OutputStream: newDemuxWriter(w),
 		//ErrorStream:  w,
 		Stdout:      true,
 		Stderr:      true,
@@ -124,7 +124,7 @@ func (l *DockerLogs) Newer(after time.Time) ([]models.Log, bool, error) {
 	opts := api.LogsOptions{
 		Context:      ctx,
 		Container:    l.id,
-		OutputStream: w,
+		OutputStream: newDemuxWriter(w),
 		Stdout:       true,
 		Stderr:       true,
 		Tail:         "all",
@@ -173,7 +173,7 @@ func (l *DockerLogs) readBefore(before time.Time, tail string) ([]models.Log, in
 	var buf bytes.Buffer
 	opts := api.LogsOptions{
 		Container:    l.id,
-		OutputStream: &buf,
+		OutputStream: newDemuxWriter(&buf),
 		Stdout:       true,
 		Stderr:       true,
 		Tail:         tail,

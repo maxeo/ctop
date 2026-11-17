@@ -113,6 +113,7 @@ func main() {
 	}
 	cursor = &GridCursor{cSuper: cSuper}
 	cGrid = compact.NewCompactGrid()
+	cGrid.Bottom = widgets.KeyHelpRows // key help at the bottom
 	header = widgets.NewCTopHeader()
 	status = widgets.NewStatusLine()
 	errView = widgets.NewErrorView()

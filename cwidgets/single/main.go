@@ -87,8 +87,15 @@ func (e *Single) Align() {
 		e.Y = 0
 	}
 
+	// use the whole terminal width (at least the minimum column width), so
+	// long values (image, env vars) are not cut and the charts are wider
+	width := e.Width
+	if width < colWidth[0] {
+		width = colWidth[0]
+	}
 	y := e.Y
 	for _, i := range e.all() {
+		i.SetWidth(width)
 		i.SetY(y)
 		y += i.GetHeight()
 	}

@@ -35,6 +35,12 @@ func NewMenu() *Menu {
 	return m
 }
 
+// SetPadding sets the space between the border and the text.
+func (m *Menu) SetPadding(x, y int) {
+	m.padding = Padding{x, y}
+	m.calcSize()
+}
+
 // Append Item to Menu
 func (m *Menu) AddItems(items ...Item) {
 	for _, i := range items {
@@ -141,7 +147,6 @@ func (m *Menu) refresh() {
 		sort.Sort(m.items)
 	}
 	m.calcSize()
-	ui.Render(m)
 }
 
 // Set width and height based on menu items

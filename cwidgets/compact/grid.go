@@ -14,6 +14,7 @@ type CompactGrid struct {
 	Width  int
 	Height int
 	Offset int // starting row offset
+	Bottom int // rows kept free at the bottom of the terminal (key help)
 }
 
 func NewCompactGrid() *CompactGrid {
@@ -47,7 +48,9 @@ func (cg *CompactGrid) GetHeight() int { return len(cg.Rows) + cg.header.Height 
 func (cg *CompactGrid) SetX(x int)     { cg.X = x }
 func (cg *CompactGrid) SetY(y int)     { cg.Y = y }
 func (cg *CompactGrid) SetWidth(w int) { cg.Width = w }
-func (cg *CompactGrid) MaxRows() int   { return cwidgets.TermHeight() - cg.header.Height - cg.Y }
+func (cg *CompactGrid) MaxRows() int {
+	return cwidgets.TermHeight() - cg.header.Height - cg.Y - cg.Bottom
+}
 
 // calculate and return per-column width
 func (cg *CompactGrid) calcWidths() []int {
@@ -75,7 +78,11 @@ func (cg *CompactGrid) calcWidths() []int {
 
 func (cg *CompactGrid) pageRows() (rows []RowBufferer) {
 	rows = append(rows, cg.header)
-	rows = append(rows, cg.Rows[cg.Offset:]...)
+	end := len(cg.Rows)
+	if max := cg.Offset + cg.MaxRows(); max >= cg.Offset && max < end {
+		end = max // don't draw over the rows kept free at the bottom
+	}
+	rows = append(rows, cg.Rows[cg.Offset:end]...)
 	return rows
 }
 

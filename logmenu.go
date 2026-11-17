@@ -103,7 +103,7 @@ type toggleLog struct {
 
 func (t *toggleLog) Toggle(on bool) string {
 	if on {
-		return fmt.Sprintf("%s %s", t.timestamp.Format("2006-01-02T15:04:05.999Z07:00"), t.message)
+		return fmt.Sprintf("%s %s", t.timestamp.Local().Format("2006-01-02 15:04:05.000"), t.message)
 	}
 	return t.message
 }

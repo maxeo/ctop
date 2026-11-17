@@ -7,6 +7,9 @@ import (
 	ui "github.com/gizak/termui"
 )
 
+// minimum width of a memory bar
+const memBarWidth = 6
+
 type Mem struct {
 	*ui.Block
 	Chart      *ui.MBarChart
@@ -41,6 +44,14 @@ func (w *Mem) Align() {
 
 	w.Chart.Height = w.Height - w.InnerLabel.Height - 2
 	w.Chart.SetWidth(w.Width - 2)
+
+	// spread the bars over the available width
+	bars := len(w.valHist.Data)
+	barWidth := (w.Width-2)/bars - w.Chart.BarGap
+	if barWidth < memBarWidth {
+		barWidth = memBarWidth
+	}
+	w.Chart.BarWidth = barWidth
 }
 
 func (w *Mem) Buffer() ui.Buffer {
@@ -65,7 +76,7 @@ func newMemChart() *ui.MBarChart {
 	mbar.X = 1
 	mbar.Border = false
 	mbar.BarGap = 1
-	mbar.BarWidth = 6
+	mbar.BarWidth = memBarWidth
 
 	mbar.BarColor[1] = ui.ColorBlack
 	mbar.NumColor[1] = ui.ColorBlack

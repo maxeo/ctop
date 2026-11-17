@@ -1,18 +1,20 @@
 package widgets
 
 import (
+	"time"
+
 	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
 )
 
 var (
 	statusHeight = 1
-	statusIter   = 3
 )
 
 type StatusLine struct {
 	Message *ui.Par
 	bg      *ui.Par
+	until   time.Time // the message is hidden from then on
 }
 
 func NewStatusLine() *StatusLine {
@@ -29,36 +31,27 @@ func NewStatusLine() *StatusLine {
 	}
 }
 
-func (sl *StatusLine) Display() {
-	ui.DefaultEvtStream.ResetHandlers()
-	defer ui.DefaultEvtStream.ResetHandlers()
-
-	iter := statusIter
-	ui.Handle("/sys/kbd/", func(ui.Event) {
-		ui.StopLoop()
-	})
-	ui.Handle("/timer/1s", func(ui.Event) {
-		iter--
-		if iter <= 0 {
-			ui.StopLoop()
-		}
-	})
-
-	ui.Render(sl)
-	ui.Loop()
+// Set shows s for d, without stopping the page it is shown on: the next
+// key still goes to the page.
+func (sl *StatusLine) Set(s string, isErr bool, d time.Duration) {
+	if isErr {
+		sl.Message.TextFgColor = ui.ThemeAttr("status.danger")
+	} else {
+		sl.Message.TextFgColor = ui.ThemeAttr("header.fg")
+	}
+	sl.Message.Text = s
+	sl.until = time.Now().Add(d)
 }
 
-// change given message on the status line
-func (sl *StatusLine) Show(s string) {
-	sl.Message.TextFgColor = ui.ThemeAttr("header.fg")
-	sl.Message.Text = s
-	sl.Display()
+// Active tells whether a message is shown.
+func (sl *StatusLine) Active() bool {
+	return sl.Message.Text != "" && time.Now().Before(sl.until)
 }
 
-func (sl *StatusLine) ShowErr(s string) {
-	sl.Message.TextFgColor = ui.ThemeAttr("status.danger")
-	sl.Message.Text = s
-	sl.Display()
+// SetY places the status line on row y.
+func (sl *StatusLine) SetY(y int) {
+	sl.bg.Y = y
+	sl.Message.Y = y
 }
 
 func (sl *StatusLine) Buffer() ui.Buffer {

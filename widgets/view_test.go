@@ -144,3 +144,34 @@ func TestScrollPastEnd(t *testing.T) {
 		t.Fatalf("expected 3 rows, got %d", len(v.TextOut))
 	}
 }
+
+func TestScrollToBottomLeavesRoom(t *testing.T) {
+	var lines []string
+	for i := 0; i < 50; i++ {
+		lines = append(lines, "line")
+	}
+	v := newTestView(lines...)
+	v.Height = 40 + titleRows + footerRows
+	v.ScrollUp(10)
+	v.ScrollToBottom()
+	v.layout()
+	if len(v.TextOut) != minVisibleRows || v.outSrc[len(v.outSrc)-1] != 49 {
+		t.Fatalf("expected the last %d lines on top, got %d rows", minVisibleRows, len(v.TextOut))
+	}
+}
+
+func TestTimestampRunes(t *testing.T) {
+	cases := map[string]int{
+		"2026-11-17 11:39:46.814 WARNING x":                  23,
+		"2026-11-17T11:39:46.814Z 2026-11-17 11:39:46.814 W": 48,
+		"[2026-11-17 11:39:46] info":                         21,
+		"2026-11-17T11:39:46+01:00 msg":                      25,
+		"s6-rc: info: service starting":                      0,
+		"2026-11-17T11:39:46.814Z plain message":             24,
+	}
+	for line, want := range cases {
+		if got := timestampRunes(line); got != want {
+			t.Errorf("timestampRunes(%q) = %d, want %d", line, got, want)
+		}
+	}
+}

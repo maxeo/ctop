@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/eqms/ctop/config"
 )
@@ -81,13 +83,44 @@ var Sorters = map[string]sortMethod{
 	},
 	"uptime": func(c1, c2 *Container) bool {
 		// Use secondary sort method if equal values
-		c1Uptime := c1.GetMeta("uptime")
-		c2Uptime := c2.GetMeta("uptime")
+		c1Uptime := uptimeSeconds(c1.GetMeta("uptime"))
+		c2Uptime := uptimeSeconds(c2.GetMeta("uptime"))
 		if c1Uptime == c2Uptime {
 			return nameSorter(c1, c2)
 		}
 		return c1Uptime > c2Uptime
 	},
+}
+
+// seconds of each unit durafmt writes
+var uptimeUnits = map[string]float64{
+	"microsecond": 1e-6,
+	"millisecond": 1e-3,
+	"second":      1,
+	"minute":      60,
+	"hour":        3600,
+	"day":         86400,
+	"week":        7 * 86400,
+	"year":        365 * 86400,
+}
+
+// uptimeSeconds converts an uptime as shown ("2 hours", "25 weeks") to
+// seconds, so that "3 weeks" sorts above "2 hours" (as text it sorted below
+// "25 weeks"). Unknown text gives -1.
+func uptimeSeconds(s string) float64 {
+	f := strings.Fields(s)
+	if len(f) < 2 {
+		return -1
+	}
+	n, err := strconv.ParseFloat(f[0], 64)
+	if err != nil {
+		return -1
+	}
+	unit, ok := uptimeUnits[strings.TrimSuffix(f[1], "s")]
+	if !ok {
+		return -1
+	}
+	return n * unit
 }
 
 func SortFields() (fields []string) {

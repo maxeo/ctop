@@ -43,6 +43,7 @@ type TextView struct {
 	Text         []ToggleText // all the text
 	TextOut      []string     // text to be displayed
 	outSrc       []int        // index in Text of each TextOut line
+	outFirst     []bool       // whether each TextOut line starts its Text line (not a wrapped part)
 	TextFgColor  ui.Attribute
 	TextBgColor  ui.Attribute
 }
@@ -289,10 +290,16 @@ func (t *TextView) ScrollToTop() {
 	t.requestRender()
 }
 
-// ScrollToBottom shows the newest line and follows new output again.
+// ScrollToBottom shows the newest lines and follows new output again. Like
+// scrolling down as far as possible, the newest lines go to the top
+// (minVisibleRows of them) with blank rows below for the lines to come.
 func (t *TextView) ScrollToBottom() {
 	t.mu.Lock()
-	t.scroll = 0
+	if t.detached {
+		t.scroll = 0
+	} else {
+		t.scroll = math.MinInt32 // clamped by layout
+	}
 	t.mu.Unlock()
 	t.requestRender()
 }
@@ -322,9 +329,16 @@ func (t *TextView) Buffer() ui.Buffer {
 
 	for row, line := range t.TextOut {
 		marks := t.search.marks(line, t.outSrc[row])
+		stamp := 0
+		if t.outFirst[row] {
+			stamp = timestampRunes(line)
+		}
 		x := x0
 		for i, ch := range []rune(line) {
 			cell := ui.Cell{Ch: ch, Fg: t.TextFgColor, Bg: t.TextBgColor}
+			if i < stamp {
+				cell.Fg = timestampColor
+			}
 			switch marks[i] {
 			case markMatch:
 				cell.Fg, cell.Bg = ui.ColorBlack, ui.ColorYellow
@@ -398,17 +412,20 @@ func (t *TextView) layout() (atTop bool) {
 	// the loop is quadratic and froze the view on logs with thousands of lines
 	var lines []string
 	var src []int
+	var first []bool
 	i := len(t.Text) - 1
 	for ; i >= 0 && len(lines) < need; i-- {
 		wrapped := splitLine(t.Text[i].Toggle(t.toggleState), maxWidth)
 		for j := len(wrapped) - 1; j >= 0; j-- {
 			lines = append(lines, wrapped[j])
 			src = append(src, i)
+			first = append(first, j == 0)
 		}
 	}
 	for l, r := 0, len(lines)-1; l < r; l, r = l+1, r-1 {
 		lines[l], lines[r] = lines[r], lines[l]
 		src[l], src[r] = src[r], src[l]
+		first[l], first[r] = first[r], first[l]
 	}
 
 	// clamp scroll to the available history
@@ -441,6 +458,7 @@ func (t *TextView) layout() (atTop bool) {
 		}
 		t.TextOut = lines[start:]
 		t.outSrc = src[start:]
+		t.outFirst = first[start:]
 		return false
 	}
 
@@ -451,6 +469,7 @@ func (t *TextView) layout() (atTop bool) {
 	}
 	t.TextOut = lines[start:end]
 	t.outSrc = src[start:end]
+	t.outFirst = first[start:end]
 	return atTop
 }
 

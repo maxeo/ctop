@@ -1,5 +1,28 @@
 # Release Notes
 
+## v0.8.11 (2026-11-17)
+
+### Container list
+- **Key help** on the last two rows, like nano (Enter, l, o, e, f, s, a, c, h, q)
+- **Help, sort field and columns stay on the list page**: `h` shows every key below the list instead of opening a separate page; `s` and `c` open a panel below the list, which keeps updating. The list is sorted while you move through the sort fields (`Enter` keeps the field, `Esc` goes back, `r` reverses), and shown, hidden or moved columns appear at once
+
+### Fixes
+- **Filter (`f`)**: Esc and Ctrl+C did not close it (Esc is never reported in termbox's Alt input mode), so ctop looked frozen; Backspace sent as `^H` was ignored; the input box now sits above the key help. The input no longer feeds a channel from the event loop
+- **Commit as image**: same Esc / Ctrl+C / Backspace fixes
+- **Open in browser (`w`)**: the browser's own error output (e.g. Chromium's) was written over the container list; the port opened changed at random between refreshes and could be an IPv6 or UDP binding; over SSH, where no local browser can open, the URL is now shown in the status line, with the address of the SSH server instead of `localhost`; a container with no published port shows a message instead of doing nothing
+- **Status messages no longer take the next key**: messages (open in browser, config saved, errors) were shown in a dialog that the next key only closed, so that key was lost (e.g. `f` did not open the filter, and the letters typed next ran list commands). They now show for 10 seconds above the key help while the list keeps working
+- **Sort by uptime** compared the text, so "3 weeks" came before "25 weeks" and "2 hours"; it now compares the duration
+- **Columns panel**: a piece of the panel border could stay near the top of the list
+- **Raw Docker timestamps inside log lines**: the 8-byte frame headers Docker adds to the logs of containers without a TTY were left in the text, and a header byte equal to a space or newline (a 32 or 10 byte line) put Docker's timestamp inside the message. The headers are now removed before splitting lines
+
+### Single view
+- **Full terminal width**: panels are no longer limited to 65 columns, so long values (image, env vars) are not cut and the memory bars spread over the width
+
+### Log view
+- **End** shows the newest lines as if scrolled past the end: the last 20 lines on top, room for new ones below
+- **Timestamps** at the start of log lines are shown in cyan (ISO 8601 with space or `T`, optional fraction, time zone and square brackets), including ctop's own with `t`
+- **`t` timestamp in a compact format**: `2026-11-17 08:49:09.250` in local time, instead of `2026-11-17T08:49:09.25Z`
+
 ## v0.8.10 (2026-11-17)
 
 ### Log view

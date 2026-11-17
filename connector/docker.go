@@ -2,6 +2,8 @@ package connector
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -146,21 +148,31 @@ func portsFormat(ports map[api.Port][]api.PortBinding) string {
 	return strings.Join(append(exposed, published...), "\n")
 }
 
+// webPort returns host:port of the lowest published TCP port, preferring
+// IPv4 bindings; bindings on every address use "localhost".
 func webPort(ports map[api.Port][]api.PortBinding) string {
-	for _, v := range ports {
-		if len(v) == 0 {
+	best, bestPort := "", 0
+	for p, bindings := range ports {
+		if p.Proto() != "tcp" {
 			continue
 		}
-		for _, binding := range v {
-			publishedIp := binding.HostIP
-			if publishedIp == "0.0.0.0" {
-				publishedIp = "localhost"
+		for _, b := range bindings {
+			n, err := strconv.Atoi(b.HostPort)
+			if err != nil || n <= 0 {
+				continue
 			}
-			publishedWebPort := fmt.Sprintf("%s:%s", publishedIp, binding.HostPort)
-			return publishedWebPort
+			v6 := strings.Contains(b.HostIP, ":")
+			if best != "" && (n > bestPort || (n == bestPort && v6)) {
+				continue
+			}
+			host := b.HostIP
+			if host == "" || host == "0.0.0.0" || host == "::" {
+				host = "localhost"
+			}
+			best, bestPort = net.JoinHostPort(host, b.HostPort), n
 		}
 	}
-	return ""
+	return best
 }
 
 func ipsFormat(networks map[string]api.ContainerNetwork) string {
