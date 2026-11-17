@@ -52,14 +52,35 @@ done
 # --- helpers ----------------------------------------------------------------
 
 if command -v curl >/dev/null 2>&1; then
-	fetch() { curl -fsSL "$1"; }
-	download() { curl -fL --progress-bar -o "$2" "$1"; }
+	# time limits so a blocked network fails with a message instead of hanging
+	fetch() { curl -fsSL --connect-timeout 15 --max-time 60 --retry 2 "$1"; }
+	download() { curl -fL --connect-timeout 15 --speed-limit 1024 --speed-time 30 --retry 2 --progress-bar -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-	fetch() { wget -qO- "$1"; }
-	download() { wget -q --show-progress -O "$2" "$1" 2>/dev/null || wget -qO "$2" "$1"; }
+	fetch() { wget -qO- --timeout=15 --tries=3 "$1"; }
+	download() { wget -q --timeout=15 --tries=3 --show-progress -O "$2" "$1" 2>/dev/null || wget -q --timeout=15 --tries=3 -O "$2" "$1"; }
 else
 	die "curl or wget is required"
 fi
+
+# latest release (without "v"), read from the redirect of
+# github.com/<repo>/releases/latest: unlike api.github.com it has no
+# 60-requests-per-hour limit. Falls back to the API.
+latest_version() {
+	url="https://github.com/$REPO/releases/latest"
+	if command -v curl >/dev/null 2>&1; then
+		tag=$(curl -fsSLI --connect-timeout 15 --max-time 60 -o /dev/null -w '%{url_effective}' "$url" 2>/dev/null || true)
+	else
+		tag=$(wget -S --spider --timeout=15 "$url" 2>&1 | sed -n 's/^ *[Ll]ocation: *\([^ ]*\).*/\1/p' | tr -d '\r' | tail -n 1)
+	fi
+	case "$tag" in
+	*/tag/*) tag=${tag##*/tag/} ;;
+	*)
+		tag=$(fetch "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null |
+			sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+		;;
+	esac
+	echo "${tag#v}"
+}
 
 # run a command with sudo only when the target directory is not writable
 as_owner() {
@@ -134,9 +155,9 @@ fi
 # --- version ----------------------------------------------------------------
 
 if [ -z "$VERSION" ]; then
-	VERSION=$(fetch "https://api.github.com/repos/$REPO/releases/latest" |
-		sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1)
-	[ -n "$VERSION" ] || die "could not determine the latest release of $REPO"
+	echo "looking up the latest release of $REPO..."
+	VERSION=$(latest_version)
+	[ -n "$VERSION" ] || die "could not determine the latest release of $REPO (is github.com reachable? or pass --version)"
 fi
 VERSION=${VERSION#v}
 
@@ -159,6 +180,7 @@ fi
 TMP=$(mktemp -d 2>/dev/null || mktemp -d -t ctop)
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
+echo "downloading $BASE/$FILE"
 download "$BASE/$FILE" "$TMP/ctop" || die "download failed: $BASE/$FILE"
 
 if [ "$VERIFY" -eq 1 ]; then
