@@ -39,3 +39,19 @@ func HandleKeys(i string, f func()) {
 		ui.Handle(k, func(ui.Event) { f() })
 	}
 }
+
+// HandleWheel calls up and down for the mouse wheel. The mouse is reported
+// only on Windows (see mouseInput): elsewhere the terminal sends the wheel as
+// arrow keys.
+func HandleWheel(up, down func()) {
+	ui.Handle("/sys/mouse", func(e ui.Event) {
+		if me, ok := e.Data.(ui.EvtMouse); ok {
+			switch me.Press {
+			case "MouseWheelUp":
+				up()
+			case "MouseWheelDown":
+				down()
+			}
+		}
+	})
+}

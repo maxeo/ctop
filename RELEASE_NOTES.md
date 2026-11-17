@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.8.14 (2026-11-17)
+
+- **Ctrl+C works like Esc** in every view: it goes back one level (closes the search, the selection, the detail view, the log or single view, the full key help) and quits ctop from the container list. It used to quit ctop from any view
+- **Mouse wheel on Windows**: the Windows console does not turn the wheel into arrow keys like xterm-like terminals do, so on Windows ctop reads the mouse and the wheel works like up / down in the container list, the panels and menus, and the single view (scrolls the environment or the detail view, moves the panel selection). Text is selected with Shift + drag while ctop runs. Linux and macOS are unchanged
+
 ## v0.8.13 (2026-11-17)
 
 ### Single view

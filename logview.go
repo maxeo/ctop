@@ -60,10 +60,6 @@ type logView struct {
 	searchMu  sync.Mutex // one search at a time
 }
 
-// ctrlCHandled is set when the log view used Ctrl+C itself (to leave the
-// selection mode), so that gridHook does not quit ctop.
-var ctrlCHandled bool
-
 func (v *logView) key(k string) {
 	if v.escID != 0 {
 		// <escape> just before: the start of a sequence, or Esc then a key
@@ -100,10 +96,8 @@ func (v *logView) key(k string) {
 		return
 	}
 
-	if k == "C-c" && v.selecting {
-		// in selection mode Ctrl+C works like Esc (it is often a copy
-		// shortcut, so it does not quit ctop there)
-		ctrlCHandled = true
+	if k == "C-c" {
+		// Ctrl+C works like Esc: back one level
 		v.escape()
 		return
 	}

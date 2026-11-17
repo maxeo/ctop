@@ -160,7 +160,7 @@ docker run --rm -ti \
 | <kbd>w</kbd> | Open the lowest published TCP port in a browser (over SSH, the URL is shown instead) |
 | <kbd>c</kbd> | Configure columns below the list (changes show at once) |
 | <kbd>S</kbd> | Save current configuration to file |
-| <kbd>q</kbd>, <kbd>Esc</kbd> | Quit ctop. When something is open (full key help, sort or columns panel, filter, menu, log view), <kbd>Esc</kbd> closes it first, one level at a time |
+| <kbd>q</kbd>, <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd> | Quit ctop. When something is open (full key help, sort or columns panel, filter, menu, log view, single view), <kbd>Esc</kbd> and <kbd>Ctrl</kbd>+<kbd>C</kbd> close it first, one level at a time |
 
 #### Log view
 
@@ -171,9 +171,9 @@ docker run --rm -ti \
 | <kbd>Home</kbd> | Start of the log (later pages load as you scroll down) |
 | <kbd>End</kbd> | Newest lines, following new output (shown as if scrolled past the end: the last 20 lines on top, room for new ones below) |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> | Search, ignoring case: loaded lines are searched while you type, <kbd>Enter</kbd> keeps the search (and searches the whole log if no loaded line matches), <kbd>n</kbd> older match, <kbd>N</kbd> newer match, <kbd>Enter</kbd> next match in the direction you last scrolled, <kbd>Esc</kbd> to end. <kbd>Tab</kbd> (in the prompt or while a search is shown) changes the mode: Base (the text as typed, anywhere), All words (words separated by spaces, all of them, in any order, also inside longer words: `warn power main` finds `WARNING (MainThread) ... power state`), Regex (Go syntax). The arrows, <kbd>PgUp</kbd> <kbd>PgDn</kbd>, <kbd>Home</kbd>, <kbd>End</kbd> and the wheel scroll the log while you type |
-| Click, <kbd>s</kbd> or <kbd>Ctrl</kbd>+<kbd>S</kbd> | Text selection mode: the mouse is left to the terminal, so click and drag selects text (<kbd>s</kbd>, <kbd>Ctrl</kbd>+<kbd>S</kbd> or <kbd>Esc</kbd> to leave; <kbd>Ctrl</kbd>+<kbd>S</kbd> also works while typing a search). The search keys work here too, a click while typing a search keeps the prompt open, and <kbd>Ctrl</kbd>+<kbd>C</kbd> works like <kbd>Esc</kbd> |
+| Click, <kbd>s</kbd> or <kbd>Ctrl</kbd>+<kbd>S</kbd> | Text selection mode: the mouse is left to the terminal, so click and drag selects text (<kbd>s</kbd>, <kbd>Ctrl</kbd>+<kbd>S</kbd> or <kbd>Esc</kbd> to leave; <kbd>Ctrl</kbd>+<kbd>S</kbd> also works while typing a search). The search keys work here too and a click while typing a search keeps the prompt open |
 | <kbd>t</kbd> | Toggle timestamps |
-| <kbd>Esc</kbd> | End the search or the selection mode, otherwise close the log view |
+| <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd> | End the search or the selection mode, otherwise close the log view |
 | <kbd>q</kbd>, <kbd>←</kbd> <kbd>→</kbd>, other keys | Close the log view |
 
 #### Single view
@@ -199,7 +199,7 @@ The single view fits the terminal: a header with the container details (in up to
 | <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Previous / next container | Previous / next container | Scroll a page |
 | <kbd>Home</kbd> <kbd>End</kbd> | Top / end of the environment | | Top / end |
 | <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd> | Filter the environment | | Filter the list (rows, or whole sections by title) |
-| <kbd>Esc</kbd> | Back to the container list | Unselect | Back to the panels |
+| <kbd>Esc</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd> | Back to the container list | Unselect | Back to the panels |
 | <kbd>l</kbd> / <kbd>m</kbd> / <kbd>e</kbd> | Logs / container menu / shell | same | same |
 | <kbd>q</kbd> | Back to the container list | same | same |
 

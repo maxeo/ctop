@@ -96,6 +96,9 @@ func SingleView() MenuFn {
 			sv.escape()
 		}
 	})
+	// the wheel works like the up and down arrows (Windows only, see
+	// HandleWheel)
+	HandleWheel(func() { sv.key("<up>") }, func() { sv.key("<down>") })
 	ui.Handle("/timer/1s", func(ui.Event) { ui.Render(ex) })
 	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
 		_ = tm.Clear(tm.ColorDefault, tm.ColorDefault) // also refreshes termbox's cached size
@@ -142,6 +145,11 @@ func (v *singleView) key(k string) {
 	}
 	if k == "M-[" || k == "M-O" {
 		v.csi.Start()
+		return
+	}
+	if k == "C-c" {
+		// Ctrl+C works like Esc: back one level
+		v.escape()
 		return
 	}
 	if action, consumed := v.csi.Feed(k); consumed {

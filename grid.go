@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"strings"
 	"time"
 
@@ -231,16 +230,6 @@ func gridEscape() {
 // gridHook sees every event, in every view, after its handler.
 func gridHook(e ui.Event) {
 	logEvent(e)
-	if e.Path == "/sys/kbd/C-c" {
-		if ctrlCHandled {
-			// the log view used it to leave the selection mode
-			ctrlCHandled = false
-			return
-		}
-		// Ctrl+C quits from any view
-		Shutdown()
-		os.Exit(0)
-	}
 }
 
 // key help at the bottom of the container list, like nano; h shows every key
@@ -302,12 +291,23 @@ func Display() bool {
 
 	HandleKeys("up", cursor.Up)
 	HandleKeys("down", cursor.Down)
+	HandleWheel(cursor.Up, cursor.Down)
 
 	HandleKeys("pgup", cursor.PgUp)
 	HandleKeys("pgdown", cursor.PgDown)
 
 	HandleKeys("exit", ui.StopLoop)
 	ui.Handle("/sys/kbd/<escape>", func(ui.Event) { gridEscape() })
+	// Ctrl+C works like Esc: it hides the full key help first, otherwise
+	// quits (at once: it is never the start of an escape sequence)
+	ui.Handle("/sys/kbd/C-c", func(ui.Event) {
+		if gridKeys.ShowAll {
+			gridKeys.ShowAll = false
+			RedrawRows(true)
+			return
+		}
+		ui.StopLoop()
+	})
 	ui.Handle(gridEscEvent, func(e ui.Event) {
 		if id, ok := e.Data.(int); ok && id == gridEscID {
 			gridEscID = 0

@@ -22,13 +22,14 @@ type MenuFn func() MenuFn
 
 // ctop's input mode. In termbox's Alt mode a lone Esc is never reported
 // (termbox waits for the next key and sends Alt+key), so Esc could close
-// nothing; ctop uses no Alt+key shortcut.
-const inputMode = tm.InputEsc
+// nothing; ctop uses no Alt+key shortcut. On Windows the mouse is reported
+// too, for the wheel (see mouseInput).
+const inputMode = tm.InputEsc | mouseInput
 
-// inputEscMode makes sure termbox is in Esc input mode while a text input or
-// panel is open, and returns the function that restores ctop's mode.
+// inputEscMode makes sure termbox is in ctop's input mode while a text input
+// or panel is open, and returns the function that restores it.
 func inputEscMode() (restore func()) {
-	tm.SetInputMode(tm.InputEsc)
+	tm.SetInputMode(inputMode)
 	return func() { tm.SetInputMode(inputMode) }
 }
 
@@ -122,6 +123,7 @@ func SortMenu() MenuFn {
 	}
 	HandleKeys("up", func() { m.Up(); apply() })
 	HandleKeys("down", func() { m.Down(); apply() })
+	HandleWheel(func() { m.Up(); apply() }, func() { m.Down(); apply() })
 	ui.Handle("/sys/kbd/r", func(ui.Event) {
 		config.Toggle("sortReversed")
 		_ = RefreshDisplay()
@@ -208,6 +210,7 @@ func ColumnsMenu() MenuFn {
 	}
 	HandleKeys("up", m.Up)
 	HandleKeys("down", m.Down)
+	HandleWheel(m.Up, m.Down)
 	HandleKeys("pgup", func() {
 		config.ColumnLeft(m.SelectedValue())
 		m.Up()
@@ -270,6 +273,7 @@ func ContainerMenu() MenuFn {
 
 	HandleKeys("up", m.Up)
 	HandleKeys("down", m.Down)
+	HandleWheel(m.Up, m.Down)
 
 	var selected string
 
@@ -522,6 +526,7 @@ func Confirm(txt string, fn func()) MenuFn {
 
 		HandleKeys("up", m.Up)
 		HandleKeys("down", m.Down)
+		HandleWheel(m.Up, m.Down)
 		HandleKeys("exit", no)
 		ui.Handle("/sys/kbd/c", func(ui.Event) { no() })
 		ui.Handle("/sys/kbd/y", func(ui.Event) { yes() })
