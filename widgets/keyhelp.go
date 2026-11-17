@@ -3,9 +3,9 @@ package widgets
 import (
 	"image"
 
-	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
 	"github.com/mattn/go-runewidth"
+	"github.com/maxeo/ctop/cwidgets"
 )
 
 // KeyHelp is one entry of a key help, shown like nano's "^X Exit": Key in

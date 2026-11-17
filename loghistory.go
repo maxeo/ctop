@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/eqms/ctop/connector/collector"
-	"github.com/eqms/ctop/models"
-	"github.com/eqms/ctop/widgets"
+	"github.com/maxeo/ctop/connector/collector"
+	"github.com/maxeo/ctop/models"
+	"github.com/maxeo/ctop/widgets"
 )
 
 // logHistory loads log lines that are not in the log view yet.

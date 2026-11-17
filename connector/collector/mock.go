@@ -7,7 +7,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/eqms/ctop/models"
+	"github.com/maxeo/ctop/models"
 )
 
 // Mock collector

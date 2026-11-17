@@ -5,7 +5,7 @@
 ## Directory Layout
 
 ```
-ctop/                              # Module: github.com/eqms/ctop
+ctop/                              # Module: github.com/maxeo/ctop
 ├── main.go                        # Binary entry point, global UI singletons
 ├── grid.go                        # termui render loop, Display(), RedrawRows()
 ├── cursor.go                      # GridCursor: filtered list, scroll, highlight
@@ -85,7 +85,7 @@ ctop/                              # Module: github.com/eqms/ctop
 ├── Makefile                       # build, build-all, run-dev, image targets
 ├── Dockerfile                     # Container image build
 ├── VERSION                        # Single source of truth for release version string
-├── go.mod                         # Module: github.com/eqms/ctop, go 1.26
+├── go.mod                         # Module: github.com/maxeo/ctop, go 1.26
 └── RELEASE_NOTES.md               # Bilingual DE/EN release notes
 ```
 

@@ -5,9 +5,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/eqms/ctop/search"
-	"github.com/eqms/ctop/widgets"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/search"
+	"github.com/maxeo/ctop/widgets"
 	tm "github.com/nsf/termbox-go"
 )
 
@@ -474,7 +474,7 @@ func withMode(keys []widgets.KeyHelp, mode search.Mode) []widgets.KeyHelp {
 }
 
 // modeChoice lists the search modes with the current one in brackets, so
-// that the prompt shows what Tab switches to: (Tab) [Base] Whole word Regex
+// that the prompt shows what Tab switches to: (Tab) [Base] All words Regex
 func modeChoice(current search.Mode) string {
 	s := "(Tab)"
 	for m := search.Base; ; m = m.Next() {

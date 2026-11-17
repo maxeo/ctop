@@ -3,6 +3,7 @@ package connector
 import (
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,10 +11,10 @@ import (
 
 	"github.com/hako/durafmt"
 
-	"github.com/eqms/ctop/connector/collector"
-	"github.com/eqms/ctop/connector/manager"
-	"github.com/eqms/ctop/container"
 	api "github.com/fsouza/go-dockerclient"
+	"github.com/maxeo/ctop/connector/collector"
+	"github.com/maxeo/ctop/connector/manager"
+	"github.com/maxeo/ctop/container"
 )
 
 func init() { enabled["docker"] = NewDocker }
@@ -179,9 +180,14 @@ func ipsFormat(networks map[string]api.ContainerNetwork) string {
 	var ips []string
 
 	for k, v := range networks {
-		s := fmt.Sprintf("%s:%s", k, v.IPAddress)
-		ips = append(ips, s)
+		if v.IPAddress == "" {
+			// e.g. the host network: no address of its own
+			ips = append(ips, k)
+			continue
+		}
+		ips = append(ips, fmt.Sprintf("%s:%s", k, v.IPAddress))
 	}
+	sort.Strings(ips)
 
 	return strings.Join(ips, "\n")
 }
@@ -209,6 +215,7 @@ func (cm *Docker) refresh(c *container.Container) {
 	c.SetMeta("health", insp.State.Health.Status)
 	c.SetMeta("restarts", fmt.Sprintf("%d", insp.RestartCount))
 	c.SetMeta("[ENV-VAR]", strings.Join(insp.Config.Env, ";"))
+	c.SetDetails(dockerDetails(insp))
 	c.SetState(insp.State.Status)
 }
 

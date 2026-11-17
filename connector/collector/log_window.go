@@ -3,7 +3,7 @@ package collector
 import (
 	"time"
 
-	"github.com/eqms/ctop/models"
+	"github.com/maxeo/ctop/models"
 )
 
 // LogCursor is a position in the log: the time of a loaded line and how many

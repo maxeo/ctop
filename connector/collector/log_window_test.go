@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/eqms/ctop/models"
+	"github.com/maxeo/ctop/models"
 )
 
 var t0 = time.Date(2026, 11, 17, 10, 0, 0, 0, time.UTC)

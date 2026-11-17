@@ -1,7 +1,7 @@
 package cwidgets
 
 import (
-	"github.com/eqms/ctop/models"
+	"github.com/maxeo/ctop/models"
 )
 
 type WidgetUpdater interface {

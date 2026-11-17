@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eqms/ctop/connector/collector"
-	"github.com/eqms/ctop/widgets"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/connector/collector"
+	"github.com/maxeo/ctop/widgets"
 	tm "github.com/nsf/termbox-go"
 )
 

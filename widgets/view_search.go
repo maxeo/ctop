@@ -3,7 +3,7 @@ package widgets
 import (
 	"unicode/utf8"
 
-	"github.com/eqms/ctop/search"
+	"github.com/maxeo/ctop/search"
 )
 
 // how a character of a visible line is highlighted
@@ -16,9 +16,9 @@ const (
 // viewSearch is the text searched in a TextView and the line found last.
 type viewSearch struct {
 	m      *search.Matcher // nil = no search
-	match  int    // index in Text of the current match, -1 if none
-	anchor int    // while typing: index in Text of the bottom line when typing started
-	scroll int    // while typing: scroll offset when typing started
+	match  int             // index in Text of the current match, -1 if none
+	anchor int             // while typing: index in Text of the bottom line when typing started
+	scroll int             // while typing: scroll offset when typing started
 }
 
 // marks returns the highlight of each rune of line (a visible line of Text[src]).

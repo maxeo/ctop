@@ -59,8 +59,8 @@
 ## CI/CD & Deployment
 
 **Hosting:**
-- GitHub: `github.com/eqms/ctop` (primary)
-- Container registry: `ghcr.io/eqms/ctop` (GitHub Container Registry)
+- GitHub: `github.com/maxeo/ctop` (primary)
+- Container registry: `ghcr.io/maxeo/ctop` (GitHub Container Registry)
 - Package distribution: GitHub Releases (binaries + `sha256sums.txt`)
 - Homebrew: `homebrew-tap/Formula/ctop.rb` distributed from the same repo
 

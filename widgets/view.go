@@ -4,9 +4,9 @@ import (
 	"math"
 	"sync"
 
-	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
 	"github.com/mattn/go-runewidth"
+	"github.com/maxeo/ctop/cwidgets"
 )
 
 type ToggleText interface {

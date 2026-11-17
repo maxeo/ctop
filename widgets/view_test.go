@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/eqms/ctop/search"
+	"github.com/maxeo/ctop/search"
 )
 
 func base(q string) *search.Matcher {
@@ -194,7 +194,7 @@ func TestSplitLineRunes(t *testing.T) {
 	}{
 		{"perché così", 6, []string{"perché", " così"}},
 		{"àèìòù", 2, []string{"àè", "ìò", "ù"}},
-		{"日本語", 4, []string{"日本", "語"}},  // wide runes: 2 cells each
+		{"日本語", 4, []string{"日本", "語"}},     // wide runes: 2 cells each
 		{"a日本", 2, []string{"a", "日", "本"}}, // a wide rune never straddles two rows
 		{"日", 1, []string{"日"}},             // too wide for a row: alone on it
 	}
@@ -281,11 +281,15 @@ func TestKeyRows(t *testing.T) {
 	}
 }
 
-func TestMarksWholeWordAccents(t *testing.T) {
-	m, _ := search.New(search.WholeWord, "è")
+func TestMarksAllWordsAccents(t *testing.T) {
+	m, _ := search.New(search.AllWords, "è perch")
 	s := viewSearch{m: m, match: -1}
 	got := s.marks("è perché", 0)
-	if got[0] != markMatch || got[len(got)-1] != 0 {
-		t.Fatalf("marks = %v: only the first è is a whole word", got)
+	// runes: è, space, p e r c h é: è and perch (é is not è)
+	want := []int{markMatch, 0, markMatch, markMatch, markMatch, markMatch, markMatch, 0}
+	for i := range want {
+		if (got[i] != 0) != (want[i] != 0) {
+			t.Fatalf("marks = %v, want matches at %v", got, want)
+		}
 	}
 }

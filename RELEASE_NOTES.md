@@ -1,5 +1,33 @@
 # Release Notes
 
+## v0.8.13 (2026-11-17)
+
+### Single view
+- **New layout that fits the terminal**: a header with the container details in up to three columns and the state in color (health shows N/A when the container has no healthcheck); CPU and MEM, then NET and IO, side by side from 110 columns, one above the other on smaller terminals; the panels get their preferred height and the environment variables take the rest of the screen
+- **CPU** shows the current, average and highest usage of the period shown, on a round scale (5, 10, 25, 50, 100%) so that a low usage does not fill the chart
+- **MEM** shows the used memory and the limit, a bar with the percentage (green, yellow from 70%, red from 90%) and the usage history
+- **NET and IO** show the current and highest rate of each direction with its history
+- **Charts fill the whole width** with the newest value on the right edge: NET and IO kept 60 values drawn from the left, so on a wide terminal they stopped halfway
+- **Environment variables** are sorted by name (VAR_2 before VAR_10), scroll with up / down and Home / End, and can be filtered with `/` or Ctrl+F
+- **Panel selection and detail views**: Enter selects a panel (colored border), the arrows move the selection and Enter opens the panel's detail view: the chart in large and a list that scrolls and can be filtered. Header: command, entrypoint, restart policy, exit code, healthcheck and its last result, security options, logging, labels. CPU and MEM: usage over the last minute, 5 and 15 minutes, and the limits. NET: IP, gateway, MAC and aliases of each network, ports, DNS, totals. IO: mounts with source, type and mode, totals. Env: every variable, long values wrapped. Left and right show the previous or next panel's details, Esc goes back one level
+- **Navigation**: PgUp / PgDn show the previous or next container; with nothing selected, left and right go back to the list and up / down scroll the environment; `l` opens the logs, `m` the container menu, `e` a shell, Esc or `q` go back to the list. Other keys no longer close the view
+- **Host network**: IPs shows `host` instead of `host:`, and NET says that the traffic is not counted per container
+- **Uptime** is updated every second instead of showing the value from when the container was last inspected
+- **Key help** at the bottom, like in the log view
+
+### Log view
+- **Base search finds the text as typed**, spaces included
+- **The Whole word mode is now All words**: words separated by spaces find the lines that contain all of them, in any order and also inside longer words (`warn power main` finds `WARNING (MainThread) ... power state`), each one highlighted
+
+### Container list
+- **Stopped and paused containers** are marked with `■` and `‖` instead of `⏹` and `⏸`, which some fonts (e.g. MobaXterm's) draw as tall emoji-like boxes
+
+### Install
+- **`install.ps1` for Windows**: `irm https://raw.githubusercontent.com/maxeo/ctop/master/install.ps1 | iex` installs or updates `ctop.exe` in PowerShell, without administrator rights: it verifies the SHA256 checksum, installs into `%LOCALAPPDATA%\Programs\ctop` (or where `ctop.exe` already is), adds the folder to the user's PATH and replaces a running `ctop.exe`. Options for version, folder, uninstall
+
+### Other
+- The Go module path is now `github.com/maxeo/ctop`
+
 ## v0.8.12 (2026-11-17)
 
 ### Container list

@@ -1,12 +1,14 @@
 package container
 
 import (
-	"github.com/eqms/ctop/connector/collector"
-	"github.com/eqms/ctop/connector/manager"
-	"github.com/eqms/ctop/cwidgets"
-	"github.com/eqms/ctop/cwidgets/compact"
-	"github.com/eqms/ctop/logging"
-	"github.com/eqms/ctop/models"
+	"sync"
+
+	"github.com/maxeo/ctop/connector/collector"
+	"github.com/maxeo/ctop/connector/manager"
+	"github.com/maxeo/ctop/cwidgets"
+	"github.com/maxeo/ctop/cwidgets/compact"
+	"github.com/maxeo/ctop/logging"
+	"github.com/maxeo/ctop/models"
 )
 
 var (
@@ -27,6 +29,26 @@ type Container struct {
 	updater   cwidgets.WidgetUpdater
 	collector collector.Collector
 	manager   manager.Manager
+
+	detailsMu sync.Mutex
+	details   *models.Details
+}
+
+// DetailsUpdater is a widget that also shows the container details.
+type DetailsUpdater interface {
+	SetDetails(models.Details)
+}
+
+// SetDetails stores what the connector knows about the container beyond
+// its metrics, and passes it to the widget if it shows it.
+func (c *Container) SetDetails(d models.Details) {
+	c.detailsMu.Lock()
+	c.details = &d
+	u := c.updater
+	c.detailsMu.Unlock()
+	if du, ok := u.(DetailsUpdater); ok {
+		du.SetDetails(d)
+	}
 }
 
 func New(id string, collector collector.Collector, manager manager.Manager) *Container {
@@ -53,8 +75,14 @@ func (c *Container) RecreateWidgets() {
 }
 
 func (c *Container) SetUpdater(u cwidgets.WidgetUpdater) {
+	c.detailsMu.Lock()
 	c.updater = u
+	d := c.details
+	c.detailsMu.Unlock()
 	c.updater.SetMeta(c.Meta)
+	if du, ok := u.(DetailsUpdater); ok && d != nil {
+		du.SetDetails(*d)
+	}
 }
 
 func (c *Container) SetMeta(k, v string) {

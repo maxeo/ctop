@@ -1,5 +1,6 @@
 // Package search matches the text searched in the log view: plain text,
-// whole words or a regular expression, always ignoring case.
+// all of several words in any order, or a regular expression, always
+// ignoring case.
 package search
 
 import (
@@ -7,7 +8,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -15,15 +15,15 @@ import (
 type Mode int
 
 const (
-	Base      Mode = iota // the text anywhere
-	WholeWord             // the text as a whole word
-	Regex                 // a regular expression (Go syntax)
+	Base     Mode = iota // the text anywhere
+	AllWords             // every word, in any order, also inside longer words
+	Regex                // a regular expression (Go syntax)
 )
 
 func (m Mode) String() string {
 	switch m {
-	case WholeWord:
-		return "Whole word"
+	case AllWords:
+		return "All words"
 	case Regex:
 		return "Regex"
 	}
@@ -37,10 +37,11 @@ func (m Mode) Next() Mode {
 
 // Matcher finds a query in lines of text.
 //
-// In the Base and Whole word modes the query can hold several words
-// separated by spaces: a line matches when it contains every word, in any
-// order, and each word is highlighted. A regular expression is one pattern,
-// spaces included.
+// Base finds the query as typed, spaces included. In the All words mode the
+// query holds words separated by spaces: a line matches when it contains
+// every word, in any order and also inside a longer word (warn finds
+// WARNING), and each word is highlighted. A regular expression is one
+// pattern, spaces included.
 type Matcher struct {
 	Query string
 	Mode  Mode
@@ -51,11 +52,14 @@ type Matcher struct {
 // spaces), and an error for an invalid regular expression.
 func New(mode Mode, query string) (*Matcher, error) {
 	var patterns []string
-	if mode == Regex {
-		if query != "" {
-			patterns = []string{query}
-		}
-	} else {
+	switch {
+	case strings.TrimSpace(query) == "":
+		// nothing to search
+	case mode == Regex:
+		patterns = []string{query}
+	case mode == Base:
+		patterns = []string{regexp.QuoteMeta(query)}
+	default:
 		for _, w := range strings.Fields(query) {
 			patterns = append(patterns, regexp.QuoteMeta(w))
 		}
@@ -125,7 +129,7 @@ func (m *Matcher) find(s string, re *regexp.Regexp, max int) [][2]int {
 			break
 		}
 		start, end := pos+loc[0], pos+loc[1]
-		if end == start || m.Mode == WholeWord && !wholeWord(s, start, end) {
+		if end == start {
 			// try again one character further
 			_, size := utf8.DecodeRuneInString(s[start:])
 			if size == 0 {
@@ -138,20 +142,4 @@ func (m *Matcher) find(s string, re *regexp.Regexp, max int) [][2]int {
 		pos = end
 	}
 	return found
-}
-
-// wholeWord reports whether s[start:end] is not preceded or followed by a
-// letter, digit or underscore (in any script, unlike \b in Go regexps).
-func wholeWord(s string, start, end int) bool {
-	if r, _ := utf8.DecodeLastRuneInString(s[:start]); start > 0 && isWordRune(r) {
-		return false
-	}
-	if r, _ := utf8.DecodeRuneInString(s[end:]); end < len(s) && isWordRune(r) {
-		return false
-	}
-	return true
-}
-
-func isWordRune(r rune) bool {
-	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }

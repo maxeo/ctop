@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/eqms/ctop/container"
-	"github.com/eqms/ctop/redact"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/container"
+	"github.com/maxeo/ctop/redact"
 )
 
 func logEvent(e ui.Event) {

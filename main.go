@@ -7,13 +7,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/eqms/ctop/config"
-	"github.com/eqms/ctop/connector"
-	"github.com/eqms/ctop/container"
-	"github.com/eqms/ctop/cwidgets/compact"
-	"github.com/eqms/ctop/logging"
-	"github.com/eqms/ctop/widgets"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/config"
+	"github.com/maxeo/ctop/connector"
+	"github.com/maxeo/ctop/container"
+	"github.com/maxeo/ctop/cwidgets/compact"
+	"github.com/maxeo/ctop/logging"
+	"github.com/maxeo/ctop/widgets"
 	tm "github.com/nsf/termbox-go"
 )
 

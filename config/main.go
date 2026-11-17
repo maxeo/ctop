@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/eqms/ctop/logging"
+	"github.com/maxeo/ctop/logging"
 )
 
 var (

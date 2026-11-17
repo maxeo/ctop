@@ -1,8 +1,8 @@
 package menu
 
 import (
-	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/cwidgets"
 )
 
 type ToolTip struct {

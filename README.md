@@ -62,6 +62,35 @@ curl -fsSL https://raw.githubusercontent.com/maxeo/ctop/master/install.sh | sh -
 
 > If `ctop` lives in `/usr/bin` and comes from a package manager (apt, snap, brew), uninstall it there instead: the next package update would overwrite the file again.
 
+### Install or update with `install.ps1` (Windows)
+
+The same for Windows, in PowerShell (Windows PowerShell 5.1 or PowerShell 7), without administrator rights: downloads `ctop-<version>-windows-amd64.exe` (Windows on ARM runs it through emulation), verifies its SHA256 checksum, installs it as `ctop.exe` where it already is (otherwise `%LOCALAPPDATA%\Programs\ctop`) and adds that folder to the user's `PATH`. A running `ctop.exe` is replaced too.
+
+```powershell
+irm https://raw.githubusercontent.com/maxeo/ctop/master/install.ps1 | iex
+```
+
+Options:
+
+```powershell
+# specific version, into another folder
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/maxeo/ctop/master/install.ps1))) -Version 0.8.12 -Dir C:	ools
+
+# uninstall (also removes the folder from the user's PATH)
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/maxeo/ctop/master/install.ps1))) -Uninstall
+```
+
+| Option | Environment variable | Meaning |
+|--------|----------------------|---------|
+| `-Version X` | `CTOP_VERSION` | install version X (default: latest release) |
+| `-Dir DIR` | `CTOP_DIR` | target folder (default: where `ctop.exe` already is, otherwise `%LOCALAPPDATA%\Programs\ctop`) |
+| `-Repo O/N` | `CTOP_REPO` | GitHub repository (default: `maxeo/ctop`) |
+| `-NoVerify` | `CTOP_NO_VERIFY=1` | skip the SHA256 check |
+| `-NoPath` | `CTOP_NO_PATH=1` | do not add the folder to the user's `PATH` |
+| `-Uninstall` | `CTOP_UNINSTALL=1` | remove `ctop.exe` |
+
+> `curl ... | sh` does not work in PowerShell, which has no `sh`: use `install.ps1` there.
+
 ### Download binaries manually
 
 Get the latest binaries from the [Releases page](https://github.com/maxeo/ctop/releases):
@@ -141,11 +170,40 @@ docker run --rm -ti \
 | <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Previous / next screen |
 | <kbd>Home</kbd> | Start of the log (later pages load as you scroll down) |
 | <kbd>End</kbd> | Newest lines, following new output (shown as if scrolled past the end: the last 20 lines on top, room for new ones below) |
-| <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> | Search, ignoring case: loaded lines are searched while you type, <kbd>Enter</kbd> keeps the search (and searches the whole log if no loaded line matches), <kbd>n</kbd> older match, <kbd>N</kbd> newer match, <kbd>Enter</kbd> next match in the direction you last scrolled, <kbd>Esc</kbd> to end. <kbd>Tab</kbd> (in the prompt or while a search is shown) changes the mode: Base (the text anywhere), Whole word, Regex (Go syntax). In Base and Whole word, several words separated by spaces find the lines that contain all of them, in any order. The arrows, <kbd>PgUp</kbd> <kbd>PgDn</kbd>, <kbd>Home</kbd>, <kbd>End</kbd> and the wheel scroll the log while you type |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> | Search, ignoring case: loaded lines are searched while you type, <kbd>Enter</kbd> keeps the search (and searches the whole log if no loaded line matches), <kbd>n</kbd> older match, <kbd>N</kbd> newer match, <kbd>Enter</kbd> next match in the direction you last scrolled, <kbd>Esc</kbd> to end. <kbd>Tab</kbd> (in the prompt or while a search is shown) changes the mode: Base (the text as typed, anywhere), All words (words separated by spaces, all of them, in any order, also inside longer words: `warn power main` finds `WARNING (MainThread) ... power state`), Regex (Go syntax). The arrows, <kbd>PgUp</kbd> <kbd>PgDn</kbd>, <kbd>Home</kbd>, <kbd>End</kbd> and the wheel scroll the log while you type |
 | Click, <kbd>s</kbd> or <kbd>Ctrl</kbd>+<kbd>S</kbd> | Text selection mode: the mouse is left to the terminal, so click and drag selects text (<kbd>s</kbd>, <kbd>Ctrl</kbd>+<kbd>S</kbd> or <kbd>Esc</kbd> to leave; <kbd>Ctrl</kbd>+<kbd>S</kbd> also works while typing a search). The search keys work here too, a click while typing a search keeps the prompt open, and <kbd>Ctrl</kbd>+<kbd>C</kbd> works like <kbd>Esc</kbd> |
 | <kbd>t</kbd> | Toggle timestamps |
 | <kbd>Esc</kbd> | End the search or the selection mode, otherwise close the log view |
 | <kbd>q</kbd>, <kbd>←</kbd> <kbd>→</kbd>, other keys | Close the log view |
+
+#### Single view
+
+The single view fits the terminal: a header with the container details (in up to three columns), the CPU, MEM, NET and IO panels (side by side from 110 columns, one above the other on smaller terminals) and the environment variables in the rest of the screen. CPU shows the current, average and highest usage of the period shown; MEM a bar with the percentage of the limit and the usage history; NET and IO the current and highest rate with their history. The key help is at the bottom.
+
+<kbd>Enter</kbd> selects a panel (its border is colored) and the arrows move the selection; <kbd>Enter</kbd> again opens the panel's detail view: the chart in large and everything known about it, in a list that scrolls and can be filtered:
+
+| Panel | Details |
+|-------|---------|
+| Header | name, id, image, state, exit code, restart policy, command, entrypoint, working dir, user, healthcheck and its last result, security options, logging, labels |
+| CPU | usage now and over the last minute, 5 and 15 minutes (average, lowest, highest), host CPUs, CPU limit, CPU set, shares, pids limit |
+| MEM | usage now and over the last periods, limit, reservation, swap |
+| NET | rates and totals, network mode, IP, gateway, MAC, IPv6 and aliases of each network, ports, DNS |
+| IO | rates and totals, mounts with source, type (bind or volume) and read-only / read-write |
+| Env | every variable, long values wrapped |
+
+| Key | Nothing selected | Panel selected | Detail view |
+|:---:|------------------|----------------|-------------|
+| <kbd>Enter</kbd> | Select the header panel | Open its detail view | |
+| <kbd>←</kbd> <kbd>→</kbd> | Back to the container list | Select the panel on the left / right | Previous / next panel's details |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Scroll the environment | Select the panel above / below | Scroll |
+| <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Previous / next container | Previous / next container | Scroll a page |
+| <kbd>Home</kbd> <kbd>End</kbd> | Top / end of the environment | | Top / end |
+| <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd> | Filter the environment | | Filter the list (rows, or whole sections by title) |
+| <kbd>Esc</kbd> | Back to the container list | Unselect | Back to the panels |
+| <kbd>l</kbd> / <kbd>m</kbd> / <kbd>e</kbd> | Logs / container menu / shell | same | same |
+| <kbd>q</kbd> | Back to the container list | same | same |
+
+In a filter, <kbd>Enter</kbd> keeps it and <kbd>Esc</kbd> clears it. Details come from `docker inspect` (the runC connector shows the header fields only).
 
 ### Config File
 
@@ -191,7 +249,7 @@ ctop/
 ├── container/               # Container model and sorting
 ├── cwidgets/                # TUI widgets
 │   ├── compact/             # Compact grid view
-│   └── single/              # Single view (CPU, Mem, Net, I/O)
+│   └── single/              # Single view (header, CPU, Mem, Net, I/O, Env)
 ├── logging/                 # Logging (log/slog + ring buffer)
 ├── widgets/                 # Base UI widgets
 ├── Makefile                 # Build targets

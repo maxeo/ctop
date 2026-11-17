@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/eqms/ctop/config"
+	"github.com/maxeo/ctop/config"
 )
 
 type sortMethod func(c1, c2 *Container) bool

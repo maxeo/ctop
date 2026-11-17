@@ -1,8 +1,8 @@
 package collector
 
 import (
-	"github.com/eqms/ctop/models"
 	api "github.com/fsouza/go-dockerclient"
+	"github.com/maxeo/ctop/models"
 )
 
 // Docker collector

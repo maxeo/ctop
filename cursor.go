@@ -3,9 +3,9 @@ package main
 import (
 	"math"
 
-	"github.com/eqms/ctop/connector"
-	"github.com/eqms/ctop/container"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/connector"
+	"github.com/maxeo/ctop/container"
 )
 
 type GridCursor struct {
@@ -103,6 +103,22 @@ func (gc *GridCursor) ScrollPage() {
 		cGrid.Align()
 	}
 
+}
+
+// Step selects the container delta rows away (negative: up) without drawing
+// the list, e.g. to show it in the single view. It reports whether the
+// selection changed.
+func (gc *GridCursor) Step(delta int) bool {
+	idx := gc.Idx()
+	next := idx + delta
+	if next < 0 || next >= gc.Len() || next == idx {
+		return false
+	}
+	gc.filtered[idx].Widgets.UnHighlight()
+	gc.selectedID = gc.filtered[next].Id
+	gc.filtered[next].Widgets.Highlight()
+	gc.ScrollPage()
+	return true
 }
 
 func (gc *GridCursor) Up() {

@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eqms/ctop/connector/collector"
-	"github.com/eqms/ctop/connector/manager"
-	"github.com/eqms/ctop/container"
 	"github.com/google/uuid"
 	"github.com/jgautheron/codename-generator"
+	"github.com/maxeo/ctop/connector/collector"
+	"github.com/maxeo/ctop/connector/manager"
+	"github.com/maxeo/ctop/container"
 )
 
 func init() { enabled["mock"] = NewMock }

@@ -1,4 +1,4 @@
-module github.com/eqms/ctop
+module github.com/maxeo/ctop
 
 require (
 	github.com/BurntSushi/toml v1.6.0

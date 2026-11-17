@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eqms/ctop/container"
-	"github.com/eqms/ctop/logging"
+	"github.com/maxeo/ctop/container"
+	"github.com/maxeo/ctop/logging"
 )
 
 var (

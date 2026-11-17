@@ -1,7 +1,7 @@
 package compact
 
 import (
-	"github.com/eqms/ctop/models"
+	"github.com/maxeo/ctop/models"
 
 	ui "github.com/gizak/termui"
 )
@@ -57,10 +57,10 @@ func (s *Status) setState(val string) {
 		mark = "▶"
 		color = ui.ThemeAttr("status.ok")
 	case "exited":
-		mark = "⏹"
+		mark = "■"
 		color = ui.ThemeAttr("status.danger")
 	case "paused":
-		mark = "⏸"
+		mark = "‖"
 	default:
 		mark = " "
 		log.Warningf("unknown status string: \"%v\"", val)

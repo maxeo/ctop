@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`ctop` is a Go terminal UI that shows real-time container metrics (CPU / mem / net / I/O) for Docker and runC. This repo is the maintained fork of the upstream `bcicen/ctop`, living at `github.com/eqms/ctop`. The module path in `go.mod` is `github.com/eqms/ctop` — not `eqms/ctop` or `bcicen/ctop`.
+`ctop` is a Go terminal UI that shows real-time container metrics (CPU / mem / net / I/O) for Docker and runC. This repo is a fork of `eqms/ctop` (itself a fork of the upstream `bcicen/ctop`), living at `github.com/maxeo/ctop`. The module path in `go.mod` is `github.com/maxeo/ctop` — not `eqms/ctop` or `bcicen/ctop`.
 
 ## Build, test, lint, run
 
@@ -42,7 +42,7 @@ git push origin v0.8.7
 The `v*` tag on push triggers `.github/workflows/ci.yml`:
 - `build` matrix → 5 binaries uploaded as artifacts
 - `release` → `softprops/action-gh-release@v2` creates the GitHub Release with `generate_release_notes: true` and all binaries + `sha256sums.txt` attached
-- `docker` → builds `ghcr.io/eqms/ctop:<version>` and `:latest` for linux/amd64+arm64
+- `docker` → builds `ghcr.io/maxeo/ctop:<version>` and `:latest` for linux/amd64+arm64
 - `homebrew` → computes SHAs of the 4 unix binaries, patches `homebrew-tap/Formula/ctop.rb`, and auto-commits `[CHG] Update Homebrew formula to <version>` back to master as `github-actions[bot]`
 
 Consequence: **do not hand-edit `homebrew-tap/Formula/ctop.rb`** — the next release overwrites it. Only bump the file if you are shipping a formula-only change without a release.

@@ -52,7 +52,7 @@
 2. Blank line
 3. External modules
 4. Blank line (optional)
-5. Internal packages (`github.com/eqms/ctop/...`)
+5. Internal packages (`github.com/maxeo/ctop/...`)
 
 **Import Aliases:**
 - `ui "github.com/gizak/termui"` — widget library aliased as `ui`
@@ -66,8 +66,8 @@ import (
     "fmt"
     "os"
 
-    "github.com/eqms/ctop/config"
-    "github.com/eqms/ctop/connector"
+    "github.com/maxeo/ctop/config"
+    "github.com/maxeo/ctop/connector"
     ui "github.com/gizak/termui"
     tm "github.com/nsf/termbox-go"
 )
@@ -176,7 +176,7 @@ Field  string // "status" or "health"
 
 ## Module Design
 
-**Module path:** `github.com/eqms/ctop`
+**Module path:** `github.com/maxeo/ctop`
 
 **Package structure:** One package per directory. Subpackages for sub-concerns:
 - `connector/collector` — metric collection per backend

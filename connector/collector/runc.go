@@ -10,7 +10,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/types"
 
-	"github.com/eqms/ctop/models"
+	"github.com/maxeo/ctop/models"
 )
 
 // Runc collector

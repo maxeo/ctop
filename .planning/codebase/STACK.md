@@ -15,7 +15,7 @@
 ## Runtime
 
 **Environment:**
-- Go 1.26 (module: `github.com/eqms/ctop`)
+- Go 1.26 (module: `github.com/maxeo/ctop`)
 - CGO_ENABLED=0 for all release builds (fully static binary, no libc dependency)
 - Linux-only files: `connector/runc.go`, `connector/collector/runc.go` use `//go:build linux` + `// +build linux`
 
@@ -105,7 +105,7 @@
 **Production / Distribution:**
 - Static binary, no runtime dependencies (CGO_ENABLED=0)
 - Platforms: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64
-- Docker image: `ghcr.io/eqms/ctop:<version>` and `:latest` for linux/amd64 + linux/arm64
+- Docker image: `ghcr.io/maxeo/ctop:<version>` and `:latest` for linux/amd64 + linux/arm64
 - Homebrew tap: `homebrew-tap/Formula/ctop.rb` (auto-updated by CI on tag push)
 
 ---

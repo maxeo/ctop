@@ -8,12 +8,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/eqms/ctop/config"
-	"github.com/eqms/ctop/container"
-	"github.com/eqms/ctop/cwidgets"
-	"github.com/eqms/ctop/widgets"
-	"github.com/eqms/ctop/widgets/menu"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/config"
+	"github.com/maxeo/ctop/container"
+	"github.com/maxeo/ctop/cwidgets"
+	"github.com/maxeo/ctop/widgets"
+	"github.com/maxeo/ctop/widgets/menu"
 	tm "github.com/nsf/termbox-go"
 )
 

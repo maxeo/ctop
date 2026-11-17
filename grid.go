@@ -5,12 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eqms/ctop/config"
-	"github.com/eqms/ctop/cwidgets"
-	"github.com/eqms/ctop/cwidgets/single"
-	"github.com/eqms/ctop/widgets"
-	"github.com/eqms/ctop/widgets/menu"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/config"
+	"github.com/maxeo/ctop/cwidgets"
+	"github.com/maxeo/ctop/widgets"
+	"github.com/maxeo/ctop/widgets/menu"
 	tm "github.com/nsf/termbox-go"
 )
 
@@ -274,39 +273,6 @@ var gridKeys = widgets.NewKeyBar([]widgets.KeyHelp{
 	{Key: "h Esc", Label: "Hide help"},
 	{Key: "q Esc ^C", Label: "Quit"},
 })
-
-func SingleView() MenuFn {
-	c := cursor.Selected()
-	if c == nil {
-		return nil
-	}
-
-	tm.Clear(tm.ColorDefault, tm.ColorDefault)
-	ui.DefaultEvtStream.ResetHandlers()
-	defer ui.DefaultEvtStream.ResetHandlers()
-
-	ex := single.NewSingle()
-	c.SetUpdater(ex)
-
-	ex.Align()
-	ui.Render(ex)
-
-	HandleKeys("up", ex.Up)
-	HandleKeys("down", ex.Down)
-	ui.Handle("/sys/kbd/", func(ui.Event) { ui.StopLoop() })
-
-	ui.Handle("/timer/1s", func(ui.Event) { ui.Render(ex) })
-	ui.Handle("/sys/wnd/resize", func(e ui.Event) {
-		tm.Clear(tm.ColorDefault, tm.ColorDefault) // also refreshes termbox's cached size
-		ex.SetWidth(cwidgets.TermWidth())
-		ex.Align()
-		log.Infof("resize: width=%v max-rows=%v", ex.Width, cGrid.MaxRows())
-	})
-
-	ui.Loop()
-	c.SetUpdater(c.Widgets)
-	return nil
-}
 
 func RefreshDisplay() error {
 	// skip display refresh during scroll

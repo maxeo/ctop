@@ -22,22 +22,23 @@ func TestModes(t *testing.T) {
 	}{
 		{Base, "log", "LOG: login catalog", "[LOG][log][log]"},
 		{Base, "a.b", "axb a.b", "[a.b]"}, // not a regexp
-		{WholeWord, "log", "LOG: login catalog log", "[LOG][log]"},
-		{WholeWord, "perch", "perché perch", "[perch]"}, // é is a letter
-		{WholeWord, "è", "è così", "[è]"},
-		{WholeWord, "a", "a_a a", "[a]"},
+		{AllWords, "log", "LOG: login catalog", "[LOG][log][log]"},
+		{AllWords, "é", "è perché é", "[é][é]"}, // è and é are different letters
 		{Regex, `err(or)?\b`, "Error: err, errors", "[Error][err]"},
 		{Regex, `\d+ ms`, "took 12 ms", "[12 ms]"},
 		{Regex, `x*`, "abc", ""}, // empty matches only
-		// several words: all of them, in any order, each highlighted
-		{Base, "warn power main", "2026-11-17 WARNING (MainThread) [x] Could not reset the power state", "[WARN][Main][power]"},
-		{Base, "blue auto", "[bluetooth_auto_recovery.recover] Bluetooth", "[blue][auto][Blue]"},
-		{Base, "blue missing", "bluetooth", ""},
-		{Base, "  blue   ", "blue", "[blue]"},
-		{WholeWord, "could power", "Could not reset the power state", "[Could][power]"},
-		{WholeWord, "blue auto", "[bluetooth_auto_recovery.recover]", ""},
-		{Regex, "a b", "a b ab", "[a b]"}, // a regex is one pattern
-		{Base, "ab abc", "abcd", "[abc]"}, // overlapping words are merged
+		// Base: the text as typed, spaces included
+		{Base, "warn power main", "WARNING (MainThread) power state", ""},
+		{Base, "reset the", "Could not RESET THE power", "[RESET THE]"},
+		{Base, " blue", "bluetooth a blue", "[ blue]"},
+		// All words: every word, in any order, also inside longer words
+		{AllWords, "warn power main", "2026-11-17 WARNING (MainThread) [x] Could not reset the power state", "[WARN][Main][power]"},
+		{AllWords, "blue auto", "[bluetooth_auto_recovery.recover] Bluetooth", "[blue][auto][Blue]"},
+		{AllWords, "power missing", "power", ""},
+		{AllWords, "  power   ", "power", "[power]"},
+		{Regex, "a b", "a b ab", "[a b]"},     // a regex is one pattern
+		{AllWords, "a a", "a b", "[a]"},       // repeated words are merged
+		{AllWords, "ab abc", "abcd", "[abc]"}, // overlapping words are merged
 	}
 	for _, c := range cases {
 		m, err := New(c.mode, c.query)
@@ -57,7 +58,7 @@ func TestNew(t *testing.T) {
 	if m, err := New(Base, ""); m != nil || err != nil {
 		t.Fatalf("empty query: %v %v", m, err)
 	}
-	if m, err := New(WholeWord, "   "); m != nil || err != nil {
+	if m, err := New(AllWords, "   "); m != nil || err != nil {
 		t.Fatalf("only spaces: %v %v", m, err)
 	}
 	if _, err := New(Regex, "a("); err == nil {
@@ -69,7 +70,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestModeCycle(t *testing.T) {
-	if Base.Next() != WholeWord || WholeWord.Next() != Regex || Regex.Next() != Base {
-		t.Fatal("modes do not cycle Base, Whole word, Regex")
+	if Base.Next() != AllWords || AllWords.Next() != Regex || Regex.Next() != Base {
+		t.Fatal("modes do not cycle Base, All words, Regex")
 	}
 }

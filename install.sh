@@ -133,7 +133,7 @@ fi
 case "$(uname -s)" in
 Linux) OS=linux ;;
 Darwin) OS=darwin ;;
-*) die "unsupported OS: $(uname -s) (Windows: download the .exe from the releases page)" ;;
+*) die "unsupported OS: $(uname -s) (Windows: use install.ps1 in PowerShell, see the README)" ;;
 esac
 
 if [ -z "$ARCH" ]; then

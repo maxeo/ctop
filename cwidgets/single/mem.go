@@ -2,93 +2,123 @@ package single
 
 import (
 	"fmt"
+	"image"
 
-	"github.com/eqms/ctop/cwidgets"
 	ui "github.com/gizak/termui"
+	"github.com/maxeo/ctop/cwidgets"
 )
 
-// minimum width of a memory bar
-const memBarWidth = 6
-
+// Mem shows the memory used against the limit, as a bar with the
+// percentage, and the usage history below when there is room.
 type Mem struct {
-	*ui.Block
-	Chart      *ui.MBarChart
-	InnerLabel *ui.Par
-	valHist    *IntHist
-	limitHist  *IntHist
+	box
+	hist  *IntHist
+	limit int
 }
 
 func NewMem() *Mem {
-	mem := &Mem{
-		Block:      ui.NewBlock(),
-		Chart:      newMemChart(),
-		InnerLabel: newMemLabel(),
-		valHist:    NewIntHist(9),
-		limitHist:  NewIntHist(9),
-	}
-	mem.Height = 13
-	mem.Width = colWidth[0]
-	mem.BorderLabel = "MEM"
-
-	mem.Chart.Data[0] = mem.valHist.Data
-	mem.Chart.Data[1] = mem.limitHist.Data
-	mem.Chart.DataLabels = mem.valHist.Labels
-
-	return mem
-}
-
-func (w *Mem) Align() {
-	y := w.Y + 1
-	w.InnerLabel.SetY(y)
-	w.Chart.SetY(y + w.InnerLabel.Height)
-
-	w.Chart.Height = w.Height - w.InnerLabel.Height - 2
-	w.Chart.SetWidth(w.Width - 2)
-
-	// spread the bars over the available width
-	bars := len(w.valHist.Data)
-	barWidth := (w.Width-2)/bars - w.Chart.BarGap
-	if barWidth < memBarWidth {
-		barWidth = memBarWidth
-	}
-	w.Chart.BarWidth = barWidth
-}
-
-func (w *Mem) Buffer() ui.Buffer {
-	buf := ui.NewBuffer()
-	buf.Merge(w.Block.Buffer())
-	buf.Merge(w.InnerLabel.Buffer())
-	buf.Merge(w.Chart.Buffer())
-	return buf
-}
-
-func newMemLabel() *ui.Par {
-	p := ui.NewPar("-")
-	p.X = 1
-	p.Border = false
-	p.Height = 1
-	p.Width = 20
-	return p
-}
-
-func newMemChart() *ui.MBarChart {
-	mbar := ui.NewMBarChart()
-	mbar.X = 1
-	mbar.Border = false
-	mbar.BarGap = 1
-	mbar.BarWidth = memBarWidth
-
-	mbar.BarColor[1] = ui.ColorBlack
-	mbar.NumColor[1] = ui.ColorBlack
-
-	mbar.NumFmt = cwidgets.ByteFormatShort
-	//mbar.ShowScale = true
-	return mbar
+	return &Mem{box: newBox("MEM"), hist: NewIntHist(histLen)}
 }
 
 func (w *Mem) Update(val int, limit int) {
-	w.valHist.Append(val)
-	w.limitHist.Append(limit - val)
-	w.InnerLabel.Text = fmt.Sprintf("%v / %v", cwidgets.ByteFormatShort(val), cwidgets.ByteFormatShort(limit))
-	//w.Data[0] = w.hist.data
+	if val < 0 {
+		return
+	}
+	w.hist.Append(val)
+	w.limit = limit
+}
+
+// pctColor returns the color of a usage percentage.
+func pctColor(pct float64) ui.Attribute {
+	switch {
+	case pct >= 90:
+		return ui.ColorRed
+	case pct >= 70:
+		return ui.ColorYellow
+	}
+	return ui.ColorGreen
+}
+
+func (w *Mem) Buffer() ui.Buffer {
+	in := w.inner()
+	_, peak := w.hist.Stats(in.Dx())
+	w.BorderLabel = "MEM"
+	if w.hist.Count > 0 {
+		w.BorderLabel = "MEM · peak " + cwidgets.ByteFormatShort(peak)
+	}
+	buf := w.Block.Buffer()
+	if in.Dy() <= 0 || w.hist.Count == 0 {
+		return buf
+	}
+	x0, end := in.Min.X+1, in.Max.X-1
+	val := w.hist.Val
+	pct := 0.0
+	if w.limit > 0 {
+		pct = float64(val) * 100 / float64(w.limit)
+	}
+	color := pctColor(pct)
+
+	// the values, and the percentage on the right
+	drawText(buf, x0, in.Min.Y, end, fmt.Sprintf("%s / %s", cwidgets.ByteFormatShort(val), cwidgets.ByteFormatShort(w.limit)), textFg(), ui.ColorDefault)
+	drawRight(buf, in.Min.Y, x0, end, fmt.Sprintf("%.1f%%", pct), color|ui.AttrBold, ui.ColorDefault)
+
+	// the bar
+	if in.Dy() >= 2 {
+		y := in.Min.Y + 1
+		width := end - x0
+		filled := int(pct*float64(width)/100 + 0.5)
+		if filled > width {
+			filled = width
+		}
+		if filled == 0 && val > 0 {
+			filled = 1
+		}
+		for x := 0; x < width; x++ {
+			if x < filled {
+				buf.Set(x0+x, y, ui.Cell{Ch: '█', Fg: color, Bg: ui.ColorDefault})
+			} else {
+				buf.Set(x0+x, y, ui.Cell{Ch: '░', Fg: dimFg(), Bg: ui.ColorDefault})
+			}
+		}
+	}
+
+	// the history, from a floor below the lowest value (see history)
+	if in.Dy() >= 4 {
+		r := image.Rect(in.Min.X, in.Min.Y+3, in.Max.X, in.Max.Y)
+		data, top := w.history(r.Dx())
+		drawSpark(buf, r, data, top, ui.ColorBlue)
+	}
+	return buf
+}
+
+// history returns the newest n values for the chart and the value of a
+// full bar. The values are measured from a floor below the lowest one, so
+// that the lowest is a quarter of the highest: the memory used rarely drops
+// near zero, and bars from zero would all look full. A flat history is a
+// quarter of the height.
+func (w *Mem) history(n int) (data []int, top int) {
+	data = w.hist.Last(n)
+	real := w.hist.Count
+	if real > n {
+		real = n
+	}
+	if real == 0 {
+		return data, 0
+	}
+	low, high := data[n-real], data[n-real]
+	for _, v := range data[n-real:] {
+		low = min(low, v)
+		high = max(high, v)
+	}
+	if high == low {
+		for i := n - real; i < n; i++ {
+			data[i] = 1
+		}
+		return data, 4
+	}
+	floor := low - (high-low)/3
+	for i := n - real; i < n; i++ {
+		data[i] -= floor
+	}
+	return data, high - floor
 }

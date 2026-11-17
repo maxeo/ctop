@@ -3,8 +3,8 @@ package compact
 import (
 	"fmt"
 
-	"github.com/eqms/ctop/cwidgets"
-	"github.com/eqms/ctop/models"
+	"github.com/maxeo/ctop/cwidgets"
+	"github.com/maxeo/ctop/models"
 
 	ui "github.com/gizak/termui"
 )
